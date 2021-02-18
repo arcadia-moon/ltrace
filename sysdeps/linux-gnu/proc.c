@@ -242,9 +242,9 @@ process_tasks(pid_t pid, pid_t **ret_tasks, size_t *ret_n)
 	size_t alloc = 0;
 
 	while (1) {
-		struct dirent entry;
 		struct dirent *result;
-		if (readdir_r(d, &entry, &result) != 0) {
+		result = readdir(d);
+		if (result != 0) {
 		fail:
 			free(tasks);
 			closedir(d);
