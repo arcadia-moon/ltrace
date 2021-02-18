@@ -21,7 +21,6 @@
 #ifndef LTRACE_H
 #define LTRACE_H
 
-typedef enum Event_type Event_type;
 enum Event_type {
 	EVENT_NONE=0,
 	EVENT_SIGNAL,
@@ -40,6 +39,7 @@ enum Event_type {
 	EVENT_NEW,        /* in this case, proc is NULL */
 	EVENT_MAX
 };
+typedef enum Event_type Event_type;
 
 typedef struct Event Event;
 struct Event {
