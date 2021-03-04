@@ -43,6 +43,11 @@
 #include "prototype.h"
 #include "summary.h"
 #include "value_dict.h"
+#include "value.h"
+#include "type.h"
+#include "expr.h"
+#include "trace.h"
+#include "proc.h"
 
 static void handle_signal(Event *event);
 static void handle_exit(Event *event);
@@ -76,25 +81,26 @@ call_handler(struct process *proc, Event *event)
 	if (handler == NULL)
 		return event;
 
-	return (*handler->on_event) (handler, event);
+	return (*handler->on_event)(handler, event);
 }
 
-void
-handle_event(Event *event)
+void handle_event(Event *event)
 {
-	if (exiting == 1) {
+	if (exiting == 1)
+	{
 		debug(1, "ltrace about to exit");
 		os_ltrace_exiting();
 		exiting = 2;
 	}
 	debug(DEBUG_FUNCTION, "handle_event(pid=%d, type=%d)",
-	      event->proc ? event->proc->pid : -1, event->type);
+		  event->proc ? event->proc->pid : -1, event->type);
 
 	/* If the thread group or an individual task define an
 	   overriding event handler, give them a chance to kick in.
 	   We will end up calling both handlers, if the first one
 	   doesn't sink the event.  */
-	if (event->proc != NULL) {
+	if (event->proc != NULL)
+	{
 		event = call_handler(event->proc, event);
 		if (event == NULL)
 			/* It was handled.  */
@@ -102,16 +108,16 @@ handle_event(Event *event)
 
 		/* Note: the previous handler has a chance to alter
 		 * the event.  */
-		if (event->proc != NULL
-		    && event->proc->leader != NULL
-		    && event->proc != event->proc->leader) {
+		if (event->proc != NULL && event->proc->leader != NULL && event->proc != event->proc->leader)
+		{
 			event = call_handler(event->proc->leader, event);
 			if (event == NULL)
 				return;
 		}
 	}
 
-	switch (event->type) {
+	switch (event->type)
+	{
 	case EVENT_NONE:
 		debug(1, "event: none");
 		return;
@@ -119,62 +125,62 @@ handle_event(Event *event)
 	case EVENT_SIGNAL:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: signal (%s [%d])",
-		      event->proc->pid,
-		      shortsignal(event->proc, event->e_un.signum),
-		      event->e_un.signum);
+			  event->proc->pid,
+			  shortsignal(event->proc, event->e_un.signum),
+			  event->e_un.signum);
 		handle_signal(event);
 		return;
 
 	case EVENT_EXIT:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: exit (%d)",
-		      event->proc->pid,
-		      event->e_un.ret_val);
+			  event->proc->pid,
+			  event->e_un.ret_val);
 		handle_exit(event);
 		return;
 
 	case EVENT_EXIT_SIGNAL:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: exit signal (%s [%d])",
-		      event->proc->pid,
-		      shortsignal(event->proc, event->e_un.signum),
-		      event->e_un.signum);
+			  event->proc->pid,
+			  shortsignal(event->proc, event->e_un.signum),
+			  event->e_un.signum);
 		handle_exit_signal(event);
 		return;
 
 	case EVENT_SYSCALL:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: syscall (%s [%d])",
-		      event->proc->pid,
-		      sysname(event->proc, event->e_un.sysnum),
-		      event->e_un.sysnum);
+			  event->proc->pid,
+			  sysname(event->proc, event->e_un.sysnum),
+			  event->e_un.sysnum);
 		handle_syscall(event);
 		return;
 
 	case EVENT_SYSRET:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: sysret (%s [%d])",
-		      event->proc->pid,
-		      sysname(event->proc, event->e_un.sysnum),
-		      event->e_un.sysnum);
+			  event->proc->pid,
+			  sysname(event->proc, event->e_un.sysnum),
+			  event->e_un.sysnum);
 		handle_sysret(event);
 		return;
 
 	case EVENT_ARCH_SYSCALL:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: arch_syscall (%s [%d])",
-		      event->proc->pid,
-		      arch_sysname(event->proc, event->e_un.sysnum),
-		      event->e_un.sysnum);
+			  event->proc->pid,
+			  arch_sysname(event->proc, event->e_un.sysnum),
+			  event->e_un.sysnum);
 		handle_arch_syscall(event);
 		return;
 
 	case EVENT_ARCH_SYSRET:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: arch_sysret (%s [%d])",
-		      event->proc->pid,
-		      arch_sysname(event->proc, event->e_un.sysnum),
-		      event->e_un.sysnum);
+			  event->proc->pid,
+			  arch_sysname(event->proc, event->e_un.sysnum),
+			  event->e_un.sysnum);
 		handle_arch_sysret(event);
 		return;
 
@@ -182,27 +188,27 @@ handle_event(Event *event)
 	case EVENT_VFORK:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: clone (%u)",
-		      event->proc->pid, event->e_un.newpid);
+			  event->proc->pid, event->e_un.newpid);
 		handle_clone(event);
 		return;
 
 	case EVENT_EXEC:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: exec()",
-		      event->proc->pid);
+			  event->proc->pid);
 		handle_exec(event);
 		return;
 
 	case EVENT_BREAKPOINT:
 		assert(event->proc != NULL);
 		debug(1, "[%d] event: breakpoint %p",
-		      event->proc->pid, event->e_un.brk_addr);
+			  event->proc->pid, event->e_un.brk_addr);
 		handle_breakpoint(event);
 		return;
 
 	case EVENT_NEW:
 		debug(1, "[%d] event: new process",
-		      event->e_un.newpid);
+			  event->e_un.newpid);
 		handle_new(event);
 		return;
 	default:
@@ -212,21 +218,25 @@ handle_event(Event *event)
 }
 
 typedef struct Pending_New Pending_New;
-struct Pending_New {
+struct Pending_New
+{
 	pid_t pid;
-	Pending_New * next;
+	Pending_New *next;
 };
-static Pending_New * pending_news = NULL;
+static Pending_New *pending_news = NULL;
 
 static int
-pending_new(pid_t pid) {
-	Pending_New * p;
+pending_new(pid_t pid)
+{
+	Pending_New *p;
 
 	debug(DEBUG_FUNCTION, "pending_new(%d)", pid);
 
 	p = pending_news;
-	while (p) {
-		if (p->pid == pid) {
+	while (p)
+	{
+		if (p->pid == pid)
+		{
 			return 1;
 		}
 		p = p->next;
@@ -235,13 +245,15 @@ pending_new(pid_t pid) {
 }
 
 static void
-pending_new_insert(pid_t pid) {
-	Pending_New * p;
+pending_new_insert(pid_t pid)
+{
+	Pending_New *p;
 
 	debug(DEBUG_FUNCTION, "pending_new_insert(%d)", pid);
 
 	p = malloc(sizeof(Pending_New));
-	if (!p) {
+	if (!p)
+	{
 		perror("malloc()");
 		exit(1);
 	}
@@ -257,7 +269,8 @@ pending_new_remove(pid_t pid)
 
 	Pending_New **pp;
 	for (pp = &pending_news; *pp != NULL; pp = &(*pp)->next)
-		if ((*pp)->pid == pid) {
+		if ((*pp)->pid == pid)
+		{
 			Pending_New *p = *pp;
 			*pp = p->next;
 			free(p);
@@ -272,15 +285,16 @@ handle_clone(Event *event)
 
 	struct process *proc = malloc(sizeof(*proc));
 	pid_t newpid = event->e_un.newpid;
-	if (proc == NULL
-	    || process_clone(proc, event->proc, newpid) < 0) {
+	if (proc == NULL || process_clone(proc, event->proc, newpid) < 0)
+	{
 		free(proc);
 		proc = NULL;
 		fprintf(stderr,
-			"Couldn't initialize tracing of process %d.\n",
-			newpid);
-
-	} else {
+				"Couldn't initialize tracing of process %d.\n",
+				newpid);
+	}
+	else
+	{
 		proc->parent = event->proc;
 		/* We save register values to the arch pointer, and
 		 * these need to be per-thread.  XXX arch_ptr should
@@ -288,21 +302,23 @@ handle_clone(Event *event)
 		proc->arch_ptr = NULL;
 	}
 
-	if (pending_new(newpid)) {
+	if (pending_new(newpid))
+	{
 		pending_new_remove(newpid);
 
-		if (proc != NULL) {
+		if (proc != NULL)
+		{
 			proc->event_handler = NULL;
-			if (event->proc->state == STATE_ATTACHED
-			    && options.follow)
+			if (event->proc->state == STATE_ATTACHED && options.follow)
 				proc->state = STATE_ATTACHED;
 			else
 				proc->state = STATE_IGNORED;
 		}
 
 		continue_process(newpid);
-
-	} else if (proc != NULL) {
+	}
+	else if (proc != NULL)
+	{
 		proc->state = STATE_BEING_CREATED;
 	}
 
@@ -320,13 +336,19 @@ handle_new(Event *event)
 	debug(DEBUG_FUNCTION, "handle_new(pid=%d)", event->e_un.newpid);
 
 	struct process *proc = pid2proc(event->e_un.newpid);
-	if (!proc) {
+	if (!proc)
+	{
 		pending_new_insert(event->e_un.newpid);
-	} else {
+	}
+	else
+	{
 		assert(proc->state == STATE_BEING_CREATED);
-		if (options.follow) {
+		if (options.follow)
+		{
 			proc->state = STATE_ATTACHED;
-		} else {
+		}
+		else
+		{
 			proc->state = STATE_IGNORED;
 		}
 		continue_process(proc->pid);
@@ -342,17 +364,19 @@ shortsignal(struct process *proc, int signum)
 	static char *signalent1[] = {
 #include "signalent1.h"
 	};
-	static char **signalents[] = { signalent0, signalent1 };
-	int nsignals[] = { sizeof signalent0 / sizeof signalent0[0],
-		sizeof signalent1 / sizeof signalent1[0]
-	};
+	static char **signalents[] = {signalent0, signalent1};
+	int nsignals[] = {sizeof signalent0 / sizeof signalent0[0],
+					  sizeof signalent1 / sizeof signalent1[0]};
 
 	debug(DEBUG_FUNCTION, "shortsignal(pid=%d, signum=%d)", proc->pid, signum);
 
 	assert(proc->personality < sizeof signalents / sizeof signalents[0]);
-	if (signum < 0 || signum >= nsignals[proc->personality]) {
+	if (signum < 0 || signum >= nsignals[proc->personality])
+	{
 		return "UNKNOWN_SIGNAL";
-	} else {
+	}
+	else
+	{
 		return signalents[proc->personality][signum];
 	}
 }
@@ -367,7 +391,7 @@ sysname(struct process *proc, int sysnum)
 	static char *syscallent1[] = {
 #include "syscallent1.h"
 	};
-	static char **syscallents[] = { syscallent0, syscallent1 };
+	static char **syscallents[] = {syscallent0, syscallent1};
 	int nsyscalls[] = {
 		sizeof syscallent0 / sizeof syscallent0[0],
 		sizeof syscallent1 / sizeof syscallent1[0],
@@ -376,10 +400,13 @@ sysname(struct process *proc, int sysnum)
 	debug(DEBUG_FUNCTION, "sysname(pid=%d, sysnum=%d)", proc->pid, sysnum);
 
 	assert(proc->personality < sizeof syscallents / sizeof syscallents[0]);
-	if (sysnum < 0 || sysnum >= nsyscalls[proc->personality]) {
+	if (sysnum < 0 || sysnum >= nsyscalls[proc->personality])
+	{
 		sprintf(result, "SYS_%d", sysnum);
 		return result;
-	} else {
+	}
+	else
+	{
 		return syscallents[proc->personality][sysnum];
 	}
 }
@@ -395,26 +422,31 @@ arch_sysname(struct process *proc, int sysnum)
 
 	debug(DEBUG_FUNCTION, "arch_sysname(pid=%d, sysnum=%d)", proc->pid, sysnum);
 
-	if (sysnum < 0 || sysnum >= nsyscalls) {
+	if (sysnum < 0 || sysnum >= nsyscalls)
+	{
 		sprintf(result, "ARCH_%d", sysnum);
 		return result;
-	} else {
+	}
+	else
+	{
 		sprintf(result, "ARCH_%s", arch_syscallent[sysnum]);
 		return result;
 	}
 }
 
 #ifndef HAVE_STRSIGNAL
-# define strsignal(SIGNUM) "???"
+#define strsignal(SIGNUM) "???"
 #endif
 
 static void
-handle_signal(Event *event) {
+handle_signal(Event *event)
+{
 	debug(DEBUG_FUNCTION, "handle_signal(pid=%d, signum=%d)", event->proc->pid, event->e_un.signum);
-	if (event->proc->state != STATE_IGNORED && !options.no_signals) {
+	if (event->proc->state != STATE_IGNORED && !options.no_signals)
+	{
 		output_line(event->proc, "--- %s (%s) ---",
-				shortsignal(event->proc, event->e_un.signum),
-				strsignal(event->e_un.signum));
+					shortsignal(event->proc, event->e_un.signum),
+					strsignal(event->e_un.signum));
 	}
 	continue_after_signal(event->proc->pid, event->e_un.signum);
 }
@@ -424,29 +456,34 @@ init_syscall_symbol(struct library_symbol *libsym, const char *name)
 {
 	static struct library syscall_lib;
 
-	if (syscall_lib.protolib == NULL) {
-		struct protolib *protolib
-			= protolib_cache_load(&g_protocache, "syscalls", 0, 1);
-		if (protolib == NULL) {
+	if (syscall_lib.protolib == NULL)
+	{
+		struct protolib *protolib = protolib_cache_load(&g_protocache, "syscalls", 0, 1);
+		if (protolib == NULL)
+		{
 			fprintf(stderr, "Couldn't load system call prototypes:"
-				" %s.\n", strerror(errno));
+							" %s.\n",
+					strerror(errno));
 
 			/* Instead, get a fake one just so we can
 			 * carry on, limping.  */
 			protolib = malloc(sizeof *protolib);
-			if (protolib == NULL) {
+			if (protolib == NULL)
+			{
 				fprintf(stderr, "Couldn't even allocate a fake "
-					"prototype library: %s.\n",
-					strerror(errno));
+								"prototype library: %s.\n",
+						strerror(errno));
 				abort();
 			}
 			protolib_init(protolib);
 		}
 
 		assert(protolib != NULL);
-		if (library_init(&syscall_lib, LT_LIBTYPE_SYSCALL) < 0) {
+		if (library_init(&syscall_lib, LT_LIBTYPE_SYSCALL) < 0)
+		{
 			fprintf(stderr, "Couldn't initialize system call "
-				"library: %s.\n", strerror(errno));
+							"library: %s.\n",
+					strerror(errno));
 			abort();
 		}
 
@@ -465,30 +502,35 @@ init_syscall_symbol(struct library_symbol *libsym, const char *name)
 static void
 account_current_callstack(struct process *proc)
 {
-	if (! options.summary)
+	if (!options.summary)
 		return;
 
 	struct timedelta spent[proc->callstack_depth];
 
 	size_t i;
-	for (i = 0; i < proc->callstack_depth; ++i) {
+	for (i = 0; i < proc->callstack_depth; ++i)
+	{
 		struct callstack_element *elem = &proc->callstack[i];
 		spent[i] = calc_time_spent(elem->enter_time);
 	}
 
-	for (i = 0; i < proc->callstack_depth; ++i) {
+	for (i = 0; i < proc->callstack_depth; ++i)
+	{
 		struct callstack_element *elem = &proc->callstack[i];
 		struct library_symbol syscall, *libsym = NULL;
-		if (elem->is_syscall) {
+		if (elem->is_syscall)
+		{
 			const char *name = sysname(proc, elem->c_un.syscall);
 			if (init_syscall_symbol(&syscall, name) >= 0)
 				libsym = &syscall;
-
-		} else {
+		}
+		else
+		{
 			libsym = elem->c_un.libfunc;
 		}
 
-		if (libsym != NULL) {
+		if (libsym != NULL)
+		{
 			summary_account_call(libsym, spent[i]);
 
 			if (elem->is_syscall)
@@ -498,11 +540,13 @@ account_current_callstack(struct process *proc)
 }
 
 static void
-handle_exit(Event *event) {
+handle_exit(Event *event)
+{
 	debug(DEBUG_FUNCTION, "handle_exit(pid=%d, status=%d)", event->proc->pid, event->e_un.ret_val);
-	if (event->proc->state != STATE_IGNORED) {
+	if (event->proc->state != STATE_IGNORED)
+	{
 		output_line(event->proc, "+++ exited (status %d) +++",
-				event->e_un.ret_val);
+					event->e_un.ret_val);
 	}
 
 	account_current_callstack(event->proc);
@@ -510,11 +554,13 @@ handle_exit(Event *event) {
 }
 
 static void
-handle_exit_signal(Event *event) {
+handle_exit_signal(Event *event)
+{
 	debug(DEBUG_FUNCTION, "handle_exit_signal(pid=%d, signum=%d)", event->proc->pid, event->e_un.signum);
-	if (event->proc->state != STATE_IGNORED) {
+	if (event->proc->state != STATE_IGNORED)
+	{
 		output_line(event->proc, "+++ killed by %s +++",
-				shortsignal(event->proc, event->e_un.signum));
+					shortsignal(event->proc, event->e_un.signum));
 	}
 
 	account_current_callstack(event->proc);
@@ -523,19 +569,25 @@ handle_exit_signal(Event *event) {
 
 static void
 output_syscall(struct process *proc, const char *name, enum tof tof,
-	       bool left, struct timedelta *spent)
+			   bool left, struct timedelta *spent)
 {
 	if (left)
 		assert(spent == NULL);
 
 	struct library_symbol syscall;
-	if (init_syscall_symbol(&syscall, name) >= 0) {
-		if (left) {
-			if (! options.summary)
+	if (init_syscall_symbol(&syscall, name) >= 0)
+	{
+		if (left)
+		{
+			if (!options.summary)
 				output_left(tof, proc, &syscall);
-		} else if (options.summary) {
+		}
+		else if (options.summary)
+		{
 			summary_account_call(&syscall, *spent);
-		} else {
+		}
+		else
+		{
 			output_right(tof, proc, &syscall, spent);
 		}
 
@@ -551,7 +603,7 @@ output_syscall_left(struct process *proc, const char *name)
 
 static void
 output_syscall_right(struct process *proc, const char *name,
-		     struct timedelta *spent)
+					 struct timedelta *spent)
 {
 	output_syscall(proc, name, LT_TOF_SYSCALLR, false, spent);
 }
@@ -560,12 +612,13 @@ static void
 handle_syscall(Event *event)
 {
 	debug(DEBUG_FUNCTION, "handle_syscall(pid=%d, sysnum=%d)", event->proc->pid, event->e_un.sysnum);
-	if (event->proc->state != STATE_IGNORED) {
+	if (event->proc->state != STATE_IGNORED)
+	{
 		callstack_push_syscall(event->proc, event->e_un.sysnum);
 		if (options.syscalls)
 			output_syscall_left(event->proc,
-					    sysname(event->proc,
-						    event->e_un.sysnum));
+								sysname(event->proc,
+										event->e_un.sysnum));
 	}
 	continue_after_syscall(event->proc, event->e_un.sysnum, 0);
 }
@@ -580,7 +633,8 @@ handle_exec(Event *event)
 	pid_t pid = proc->pid;
 
 	debug(DEBUG_FUNCTION, "handle_exec(pid=%d)", proc->pid);
-	if (proc->state == STATE_IGNORED) {
+	if (proc->state == STATE_IGNORED)
+	{
 	untrace:
 		untrace_pid(pid);
 		remove_process(proc);
@@ -590,9 +644,10 @@ handle_exec(Event *event)
 
 	account_current_callstack(proc);
 
-	if (process_exec(proc) < 0) {
+	if (process_exec(proc) < 0)
+	{
 		fprintf(stderr,
-			"couldn't reinitialize process %d after exec\n", pid);
+				"couldn't reinitialize process %d after exec\n", pid);
 		goto untrace;
 	}
 
@@ -600,14 +655,17 @@ handle_exec(Event *event)
 }
 
 static void
-handle_arch_syscall(Event *event) {
+handle_arch_syscall(Event *event)
+{
 	debug(DEBUG_FUNCTION, "handle_arch_syscall(pid=%d, sysnum=%d)", event->proc->pid, event->e_un.sysnum);
-	if (event->proc->state != STATE_IGNORED) {
+	if (event->proc->state != STATE_IGNORED)
+	{
 		callstack_push_syscall(event->proc, 0xf0000 + event->e_un.sysnum);
-		if (options.syscalls) {
+		if (options.syscalls)
+		{
 			output_syscall_left(event->proc,
-					    arch_sysname(event->proc,
-							 event->e_un.sysnum));
+								arch_sysname(event->proc,
+											 event->e_un.sysnum));
 		}
 	}
 	continue_process(event->proc->pid);
@@ -617,9 +675,10 @@ static void
 handle_x_sysret(Event *event, char *(*name_cb)(struct process *, int))
 {
 	debug(DEBUG_FUNCTION, "handle_x_sysret(pid=%d, sysnum=%d)",
-	      event->proc->pid, event->e_un.sysnum);
+		  event->proc->pid, event->e_un.sysnum);
 
-	if (event->proc->state != STATE_IGNORED) {
+	if (event->proc->state != STATE_IGNORED)
+	{
 		unsigned d = event->proc->callstack_depth;
 		assert(d > 0);
 		struct callstack_element *elem = &event->proc->callstack[d - 1];
@@ -628,9 +687,9 @@ handle_x_sysret(Event *event, char *(*name_cb)(struct process *, int))
 		struct timedelta spent = calc_time_spent(elem->enter_time);
 		if (options.syscalls)
 			output_syscall_right(event->proc,
-					     name_cb(event->proc,
-						     event->e_un.sysnum),
-					     &spent);
+								 name_cb(event->proc,
+										 event->e_un.sysnum),
+								 &spent);
 
 		callstack_pop(event->proc);
 	}
@@ -655,15 +714,16 @@ output_right_tos(struct process *proc)
 	size_t d = proc->callstack_depth;
 	assert(d > 0);
 	struct callstack_element *elem = &proc->callstack[d - 1];
-	assert(! elem->is_syscall);
+	assert(!elem->is_syscall);
 
-	if (proc->state != STATE_IGNORED) {
+	if (proc->state != STATE_IGNORED)
+	{
 		struct timedelta spent = calc_time_spent(elem->enter_time);
 		if (options.summary)
 			summary_account_call(elem->c_un.libfunc, spent);
 		else
 			output_right(LT_TOF_FUNCTIONR, proc, elem->c_un.libfunc,
-				     &spent);
+						 &spent);
 	}
 }
 
@@ -682,22 +742,57 @@ handle_breakpoint(Event *event)
 	void *brk_addr = event->e_un.brk_addr;
 
 	/* The leader has terminated.  */
-	if (leader == NULL) {
+	if (leader == NULL)
+	{
 		continue_process(event->proc->pid);
 		return;
 	}
 
 	debug(DEBUG_FUNCTION, "handle_breakpoint(pid=%d, addr=%p)",
-	      event->proc->pid, brk_addr);
+		  event->proc->pid, brk_addr);
 	debug(2, "event: breakpoint (%p)", brk_addr);
-
-	for (i = event->proc->callstack_depth - 1; i >= 0; i--) {
-		if (brk_addr == event->proc->callstack[i].return_addr) {
-			for (j = event->proc->callstack_depth - 1; j > i; j--)
+	int now_callstack_index = event->proc->callstack_depth - 1;
+	if (brk_addr == event->proc->callstack[now_callstack_index].return_addr)
+	{
+		struct callstack_element *now_callstack = &event->proc->callstack[now_callstack_index];
+		struct library_symbol *libsym = now_callstack->c_un.libfunc;
+		if (strcmp(libsym->name, "dlmopen") == 0)
+		{
+			struct value *value = val_dict_get_num(now_callstack->arguments, 1);
+			if (libsym->lib != NULL && value->type->type == ARGTYPE_POINTER && value->type->u.ptr_info.info->type != ARGTYPE_VOID)
+			{
+				struct value element;
+				if (value_init_deref(&element, value) >= 0)
+				{
+					struct find_proto_data data = {libsym->name};
+					data.ret = protolib_lookup_prototype(libsym->lib->protolib, libsym->name, libsym->lib->type != LT_LIBTYPE_SYSCALL);
+					if (data.ret == NULL && libsym->plt_type == LS_TOPLT_EXEC)
+						proc_each_library(event->proc, NULL, find_proto_cb, &data);
+					if (data.ret != NULL)
+					{
+						struct prototype *func = data.ret;
+						struct value retval;
+						struct fetch_context *context = fetch_arg_init(LT_TOF_FUNCTION, event->proc, func->return_info);
+						value_init(&retval, event->proc, NULL, func->return_info, 0);
+						if (fetch_retval(context, LT_TOF_FUNCTIONR, event->proc, func->return_info, &retval) >= 0)
+						{
+							crawl_linkmap_exclusive(event->proc, (void *)retval.u.value);
+						}
+					}
+				}
+				value_destroy(&element);
+			}
+		}
+	}
+	for (i = now_callstack_index; i >= 0; i--)
+	{
+		if (brk_addr == event->proc->callstack[i].return_addr)
+		{
+			for (j = now_callstack_index; j > i; j--)
 				callstack_pop(event->proc);
 
 			struct library_symbol *libsym =
-			    event->proc->callstack[i].c_un.libfunc;
+				event->proc->callstack[i].c_un.libfunc;
 
 			arch_symbol_ret(event->proc, libsym);
 			output_right_tos(event->proc);
@@ -709,17 +804,17 @@ handle_breakpoint(Event *event)
 			 * for different symbols.  This should only
 			 * happen for entry point tracing, i.e. for -x
 			 * everywhere, or -x and -e on MIPS.  */
-			while (event->proc->callstack_depth > 0) {
+			while (event->proc->callstack_depth > 0)
+			{
 				struct callstack_element *prev;
 				size_t d = event->proc->callstack_depth;
 				prev = &event->proc->callstack[d - 1];
 
-				if (prev->c_un.libfunc == libsym
-				    || prev->return_addr != brk_addr)
+				if (prev->c_un.libfunc == libsym || prev->return_addr != brk_addr)
 					break;
 
 				arch_symbol_ret(event->proc,
-						prev->c_un.libfunc);
+								prev->c_un.libfunc);
 				output_right_tos(event->proc);
 				callstack_pop(event->proc);
 			}
@@ -728,9 +823,12 @@ handle_breakpoint(Event *event)
 			 * of the breakpoint, but if we are in a
 			 * recursive call, it's still enabled.  In
 			 * that case we need to skip it properly.  */
-			if ((sbp = address2bpstruct(leader, brk_addr)) != NULL) {
+			if ((sbp = address2bpstruct(leader, brk_addr)) != NULL)
+			{
 				continue_after_breakpoint(event->proc, sbp);
-			} else {
+			}
+			else
+			{
 				set_instruction_pointer(event->proc, brk_addr);
 				continue_process(event->proc->pid);
 			}
@@ -742,24 +840,27 @@ handle_breakpoint(Event *event)
 		breakpoint_on_hit(sbp, event->proc);
 	else if (event->proc->state != STATE_IGNORED)
 		output_line(event->proc,
-			    "unexpected breakpoint at %p", brk_addr);
+					"unexpected breakpoint at %p", brk_addr);
 
 	/* breakpoint_on_hit may delete its own breakpoint, so we have
 	 * to look it up again.  */
-	if ((sbp = address2bpstruct(leader, brk_addr)) != NULL) {
+	if ((sbp = address2bpstruct(leader, brk_addr)) != NULL)
+	{
 
-		if (event->proc->state != STATE_IGNORED
-		    && sbp->libsym != NULL) {
+		if (event->proc->state != STATE_IGNORED && sbp->libsym != NULL)
+		{
 			event->proc->stack_pointer = get_stack_pointer(event->proc);
 			callstack_push_symfunc(event->proc, sbp);
-			if (! options.summary)
+			if (!options.summary)
 				output_left(LT_TOF_FUNCTION, event->proc,
-					    sbp->libsym);
+							sbp->libsym);
 		}
 
 		breakpoint_on_continue(sbp, event->proc);
 		return;
-	} else {
+	}
+	else
+	{
 		set_instruction_pointer(event->proc, brk_addr);
 	}
 
@@ -773,7 +874,8 @@ callstack_push_syscall(struct process *proc, int sysnum)
 
 	debug(DEBUG_FUNCTION, "callstack_push_syscall(pid=%d, sysnum=%d)", proc->pid, sysnum);
 	/* FIXME: not good -- should use dynamic allocation. 19990703 mortene. */
-	if (proc->callstack_depth == MAX_CALLDEPTH - 1) {
+	if (proc->callstack_depth == MAX_CALLDEPTH - 1)
+	{
 		fprintf(stderr, "%s: Error: call nesting too deep!\n", __func__);
 		abort();
 		return;
@@ -786,7 +888,8 @@ callstack_push_syscall(struct process *proc, int sysnum)
 	elem->return_addr = NULL;
 
 	proc->callstack_depth++;
-	if (opt_T || options.summary) {
+	if (opt_T || options.summary)
+	{
 		struct timezone tz;
 		gettimeofday(&elem->enter_time, &tz);
 	}
@@ -798,9 +901,10 @@ callstack_push_symfunc(struct process *proc, struct breakpoint *bp)
 	struct callstack_element *elem;
 
 	debug(DEBUG_FUNCTION, "callstack_push_symfunc(pid=%d, symbol=%s)",
-	      proc->pid, bp->libsym->name);
+		  proc->pid, bp->libsym->name);
 	/* FIXME: not good -- should use dynamic allocation. 19990703 mortene. */
-	if (proc->callstack_depth == MAX_CALLDEPTH - 1) {
+	if (proc->callstack_depth == MAX_CALLDEPTH - 1)
+	{
 		fprintf(stderr, "%s: Error: call nesting too deep!\n", __func__);
 		abort();
 		return;
@@ -812,10 +916,11 @@ callstack_push_symfunc(struct process *proc, struct breakpoint *bp)
 	elem->c_un.libfunc = bp->libsym;
 
 	struct breakpoint *rbp = NULL;
-	if (breakpoint_get_return_bp(&rbp, bp, proc) == 0
-	    && rbp != NULL) {
+	if (breakpoint_get_return_bp(&rbp, bp, proc) == 0 && rbp != NULL)
+	{
 		struct breakpoint *ext_rbp = insert_breakpoint(proc, rbp);
-		if (ext_rbp != rbp) {
+		if (ext_rbp != rbp)
+		{
 			breakpoint_destroy(rbp);
 			free(rbp);
 			rbp = ext_rbp;
@@ -824,24 +929,25 @@ callstack_push_symfunc(struct process *proc, struct breakpoint *bp)
 
 	elem->return_addr = rbp != NULL ? rbp->addr : 0;
 
-	if (opt_T || options.summary) {
+	if (opt_T || options.summary)
+	{
 		struct timezone tz;
 		gettimeofday(&elem->enter_time, &tz);
 	}
 }
 
-void
-callstack_pop(struct process *proc)
+void callstack_pop(struct process *proc)
 {
 	struct callstack_element *elem;
 	assert(proc->callstack_depth > 0);
 
 	debug(DEBUG_FUNCTION, "callstack_pop(pid=%d)", proc->pid);
 	elem = &proc->callstack[proc->callstack_depth - 1];
-	if (!elem->is_syscall && elem->return_addr) {
-		struct breakpoint *bp
-			= address2bpstruct(proc->leader, elem->return_addr);
-		if (bp != NULL) {
+	if (!elem->is_syscall && elem->return_addr)
+	{
+		struct breakpoint *bp = address2bpstruct(proc->leader, elem->return_addr);
+		if (bp != NULL)
+		{
 			breakpoint_on_hit(bp, proc);
 			delete_breakpoint(proc, bp);
 		}
@@ -850,7 +956,8 @@ callstack_pop(struct process *proc)
 	if (elem->fetch_context != NULL)
 		fetch_arg_done(elem->fetch_context);
 
-	if (elem->arguments != NULL) {
+	if (elem->arguments != NULL)
+	{
 		val_dict_destroy(elem->arguments);
 		free(elem->arguments);
 	}

@@ -36,6 +36,22 @@ struct prototype {
 	int own_return_info : 1;
 };
 
+struct find_proto_data
+{
+	const char *name;
+	struct prototype *ret;
+};
+
+struct lookup_prototype_alias_context
+{
+	struct library *lib;
+	struct prototype *result; // output
+};
+
+enum callback_status find_proto_cb(struct process *proc, struct library *lib, void *d);
+struct prototype * library_get_prototype(struct library *lib, const char *name);
+enum callback_status lookup_prototype_alias_cb(const char *name, void *data);
+bool snip_period(char *buf);
 /* Initialize a prototype PROTO.  The name will be NAME, and the
  * corresponding string will be owned and freed on destroy if
  * OWN_NAME.  */

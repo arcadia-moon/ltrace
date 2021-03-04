@@ -32,6 +32,7 @@
 #include "options.h"
 #include "read_config_file.h"
 #include "backend.h"
+#include "library.h"
 
 struct protolib_cache g_protocache;
 static struct protolib legacy_typedefs;
@@ -358,6 +359,97 @@ consider_confdir_cb(struct opt_F_t *entry, void *d)
 	data->result = consider_config_dir(data->self,
 					   entry->pathname, data->key);
 	return data->result != NULL ? CBS_STOP : CBS_CONT;
+}
+
+enum callback_status find_proto_cb(struct process *proc, struct library *lib, void *d)
+{
+	struct find_proto_data *data = d;
+	data->ret = library_get_prototype(lib, data->name);
+	return CBS_STOP_IF(data->ret != NULL);
+}
+
+struct prototype * library_get_prototype(struct library *lib, const char *name)
+{
+	if (lib->protolib == NULL)
+	{
+		size_t sz = strlen(lib->soname);
+		char buf[sz + 1];
+		memcpy(buf, lib->soname, sz + 1);
+
+		do
+		{
+			if (protolib_cache_maybe_load(&g_protocache, buf, 0,
+										  true, &lib->protolib) < 0)
+				return NULL;
+		} while (lib->protolib == NULL && lib->type == LT_LIBTYPE_DSO && snip_period(buf));
+
+#if defined(HAVE_LIBDW)
+		// DWARF data fills in the gaps in the .conf files, so I don't
+		// check for lib->protolib==NULL here
+		if (lib->dwfl_module != NULL &&
+			(filter_matches_library(options.plt_filter, lib) ||
+			 filter_matches_library(options.static_filter, lib) ||
+			 filter_matches_library(options.export_filter, lib)))
+			import_DWARF_prototypes(lib);
+		else
+			debug(DEBUG_FUNCTION,
+				  "Filter didn't match prototype '%s' in lib '%s'. "
+				  "Not importing",
+				  name, lib->soname);
+#endif
+
+		if (lib->protolib == NULL)
+			lib->protolib = protolib_cache_default(&g_protocache,
+												   buf, 0);
+	}
+	if (lib->protolib == NULL)
+		return NULL;
+
+	struct prototype *result =
+		protolib_lookup_prototype(lib->protolib, name,
+								  lib->type != LT_LIBTYPE_SYSCALL);
+	if (result != NULL)
+		return result;
+
+	// prototype not found. Is it aliased?
+	struct lookup_prototype_alias_context context = {.lib = lib,
+													 .result = NULL};
+	library_exported_names_each_alias(&lib->exported_names, name,
+									  NULL, lookup_prototype_alias_cb,
+									  &context);
+
+	// if found, the prototype is stored here, otherwise it's NULL
+	return context.result;
+}
+
+enum callback_status lookup_prototype_alias_cb(const char *name, void *data)
+{
+	struct lookup_prototype_alias_context *context =
+		(struct lookup_prototype_alias_context *)data;
+
+	struct library *lib = context->lib;
+
+	context->result =
+		protolib_lookup_prototype(lib->protolib, name,
+								  lib->type != LT_LIBTYPE_SYSCALL);
+	if (context->result != NULL)
+		return CBS_STOP;
+
+	return CBS_CONT;
+}
+
+bool snip_period(char *buf)
+{
+	char *period = strrchr(buf, '.');
+	if (period != NULL && strcmp(period, ".so") != 0)
+	{
+		*period = 0;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 static int

@@ -50,6 +50,7 @@ struct options_t options = {
 #ifdef USE_DEMANGLE
 	.demangle = 0,                /* Demangle low-level symbol names */
 #endif
+	.no_display = 0,			  /* No output on the display */
 	.indent = 0,                  /* indent output according to program flow */
 	.output = NULL,               /* output to a specific file */
 	.summary = 0,                 /* Report a summary on program exit */
@@ -98,6 +99,7 @@ usage(void) {
 		"  -l, --library=LIBRARY_PATTERN only trace symbols implemented by this library.\n"
 		"  -L                  do NOT display library calls.\n"
 		"  -n, --indent=NR     indent output by NR spaces for each call level nesting.\n"
+		"  -N                  No output on the display.\n"
 		"  -o, --output=FILENAME write the trace output to file with given name.\n"
 		"  -p PID              attach to the process with the process ID pid.\n"
 		"  -r                  print relative timestamps.\n"
@@ -523,6 +525,7 @@ process_options(int argc, char **argv)
 	progname = argv[0];
 	options.output = stderr;
 	options.no_signals = 0;
+	options.no_display = 0;
 #if defined(HAVE_UNWINDER)
 	options.bt_depth = -1;
 #endif /* defined(HAVE_UNWINDER) */
@@ -547,8 +550,8 @@ process_options(int argc, char **argv)
 			{"help", 0, 0, 'h'},
 			{"library", 1, 0, 'l'},
 			{"output", 1, 0, 'o'},
+			{"no-display", 0, 0, 'N'},
 			{"version", 0, 0, 'V'},
-			{"no-signals", 0, 0, 'b'},
 # if defined(HAVE_UNWINDER)
 			{"where", 1, 0, 'w'},
 # endif /* defined(HAVE_UNWINDER) */
@@ -563,6 +566,7 @@ process_options(int argc, char **argv)
 #if defined(HAVE_UNWINDER)
 			"w:"
 #endif
+			"N"
 			"cfhiLrStTVba:A:D:e:F:l:n:o:p:s:u:x:";
 
 #ifdef HAVE_GETOPT_LONG
@@ -635,6 +639,9 @@ process_options(int argc, char **argv)
 			break;
 		case 'n':
 			options.indent = parse_int(optarg, 'n', 0, 20);
+			break;
+		case 'N':
+			options.no_display = 1;
 			break;
 		case 'o':
 			options.output = fopen(optarg, "w");

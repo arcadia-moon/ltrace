@@ -554,6 +554,89 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 	return;
 }
 
+void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
+{
+	debug (DEBUG_FUNCTION, "crawl_linkmap_exclusive()");
+
+	if (!r_map) {
+		debug(2, "Debug structure or it's linkmap are NULL!");
+		return;
+	}
+
+	/* XXX The double cast should be removed when
+	 * arch_addr_t becomes integral type.  */
+	arch_addr_t addr = r_map;
+
+	while (addr != 0) {
+		struct lt_link_map_64 rlm = {};
+		if (lm_fetcher(proc)(proc, addr, &rlm) < 0) {
+			debug(2, "Unable to read link map");
+			return;
+		}
+
+		arch_addr_t key = addr;
+		/* XXX The double cast should be removed when
+		 * arch_addr_t becomes integral type.  */
+		addr = (arch_addr_t)(uintptr_t)rlm.l_next;
+		if (rlm.l_name == 0) {
+			debug(2, "Name of mapped library is NULL");
+			return;
+		}
+
+		char lib_name[BUFSIZ];
+		/* XXX The double cast should be removed when
+		 * arch_addr_t becomes integral type.  */
+		umovebytes(proc, (arch_addr_t)(uintptr_t)rlm.l_name,
+			   lib_name, sizeof(lib_name));
+
+		/* Library name can be an empty string, in which case
+		 * the entry represents either the main binary, or a
+		 * VDSO.  Unfortunately we can't rely on that, as in
+		 * recent glibc, that entry is initialized to VDSO
+		 * SONAME.
+		 *
+		 * It's not clear how to detect VDSO in this case.  We
+		 * can't assume that l_name of real DSOs will be
+		 * either absolute or relative (for LD_LIBRARY_PATH=:
+		 * it will be neither).  We can't compare l_addr with
+		 * AT_SYSINFO_EHDR either, as l_addr is bias (which
+		 * also means it's not unique, and therefore useless
+		 * for this).  We could load VDSO from process image
+		 * and at least compare actual SONAMEs.  For now, this
+		 * kludge is about the best that we can do.  */
+		if (*lib_name == 0
+		    || strcmp(lib_name, "linux-vdso.so.1") == 0
+		    || strcmp(lib_name, "linux-gate.so.1") == 0
+		    || strcmp(lib_name, "linux-vdso32.so.1") == 0
+		    || strcmp(lib_name, "linux-vdso64.so.1") == 0)
+			continue;
+
+		/* Do we have that library already?  */
+		if (proc_each_library(proc, NULL, library_with_key_cb, &key))
+			continue;
+
+		struct library *lib = malloc(sizeof(*lib));
+		if (lib == NULL) {
+		fail:
+			free(lib);
+			fprintf(stderr, "Couldn't load ELF object %s: %s\n",
+				lib_name, strerror(errno));
+			continue;
+		}
+
+		if (library_init(lib, LT_LIBTYPE_DSO) < 0)
+			goto fail;
+
+		if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0) {
+			library_destroy(lib);
+			goto fail;
+		}
+		lib->key = key;
+		proc_add_library(proc, lib);
+	}
+	return;
+}
+
 static int
 load_debug_struct(struct process *proc, struct lt_r_debug_64 *ret)
 {

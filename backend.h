@@ -191,7 +191,7 @@ GElf_Addr arch_plt_sym_val(struct ltelf *lte, size_t ndx, GElf_Rela *rela);
  * should insert an introspection breakpoint for handling dynamic
  * linker library loads.  */
 int linkmap_init(struct process *proc, arch_addr_t dyn_addr);
-
+void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map);
 /* This should produce and return the next event of one of the traced
  * processes.  The returned pointer will not be freed by the core and
  * should be either statically allocated, or the management should be
