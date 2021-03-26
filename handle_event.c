@@ -756,31 +756,24 @@ handle_breakpoint(Event *event)
 	{
 		struct callstack_element *now_callstack = &event->proc->callstack[now_callstack_index];
 		struct library_symbol *libsym = now_callstack->c_un.libfunc;
-		if (strcmp(libsym->name, "dlmopen") == 0)
+		if (strcmp(libsym->name, "dlmopen") == 0 && library_load_handler(libsym) == 1)
 		{
-			struct value *value = val_dict_get_num(now_callstack->arguments, 1);
-			if (libsym->lib != NULL && value->type->type == ARGTYPE_POINTER && value->type->u.ptr_info.info->type != ARGTYPE_VOID)
+			struct arg_type_info dlmopen_arg_type = {.type = ARGTYPE_POINTER};
+			struct prototype func = {
+				.return_info = &dlmopen_arg_type,
+				.own_return_info = 1,
+			};
+			struct value retval;
+			bool own_retval = false;
+			value_init(&retval, event->proc, NULL, func.return_info, 0);
+			if (fetch_retval(now_callstack->fetch_context, LT_TOF_FUNCTIONR, event->proc, func.return_info, &retval) >= 0)
 			{
-				struct value element;
-				if (value_init_deref(&element, value) >= 0)
-				{
-					struct find_proto_data data = {libsym->name};
-					data.ret = protolib_lookup_prototype(libsym->lib->protolib, libsym->name, libsym->lib->type != LT_LIBTYPE_SYSCALL);
-					if (data.ret == NULL && libsym->plt_type == LS_TOPLT_EXEC)
-						proc_each_library(event->proc, NULL, find_proto_cb, &data);
-					if (data.ret != NULL)
-					{
-						struct prototype *func = data.ret;
-						struct value retval;
-						struct fetch_context *context = fetch_arg_init(LT_TOF_FUNCTION, event->proc, func->return_info);
-						value_init(&retval, event->proc, NULL, func->return_info, 0);
-						if (fetch_retval(context, LT_TOF_FUNCTIONR, event->proc, func->return_info, &retval) >= 0)
-						{
-							crawl_linkmap_exclusive(event->proc, (void *)retval.u.value);
-						}
-					}
-				}
-				value_destroy(&element);
+				own_retval = true;
+				crawl_linkmap_exclusive(event->proc, (void *)retval.u.value);
+			}
+			if (own_retval)
+			{
+				value_destroy(&retval);
 			}
 		}
 	}

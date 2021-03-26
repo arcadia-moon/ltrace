@@ -2,6 +2,11 @@
     "files.associations": {
         "limits": "cpp",
         "ostream": "cpp",
-        "type.h": "c"
+        "type.h": "c",
+        "array": "c",
+        "istream": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }

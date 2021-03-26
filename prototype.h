@@ -28,7 +28,8 @@
 #include "vect.h"
 
 /* Function prototype.  */
-struct prototype {
+struct prototype
+{
 	/* Vector of struct param.  */
 	struct vect params;
 
@@ -49,8 +50,12 @@ struct lookup_prototype_alias_context
 };
 
 enum callback_status find_proto_cb(struct process *proc, struct library *lib, void *d);
-struct prototype * library_get_prototype(struct library *lib, const char *name);
+struct prototype *library_get_prototype(struct library *lib, const char *name);
 enum callback_status lookup_prototype_alias_cb(const char *name, void *data);
+struct prototype *lookup_symbol_prototype(struct process *proc, struct library_symbol *libsym);
+struct prototype *build_default_prototype(void);
+struct arg_type_info *get_unknown_type(void);
+
 bool snip_period(char *buf);
 /* Initialize a prototype PROTO.  The name will be NAME, and the
  * corresponding string will be owned and freed on destroy if
@@ -78,13 +83,13 @@ struct param *prototype_get_nth_param(struct prototype *proto, size_t n);
 
 /* Iterate through the parameters of PROTO.  See callback.h for notes
  * on iteration interfaces.  */
-struct param *prototype_each_param
-	(struct prototype *proto, struct param *start_after,
-	 enum callback_status (*cb)(struct prototype *, struct param *, void *),
-	 void *data);
+struct param *prototype_each_param(struct prototype *proto, struct param *start_after,
+								   enum callback_status (*cb)(struct prototype *, struct param *, void *),
+								   void *data);
 
 /* For storing type aliases.  */
-struct named_type {
+struct named_type
+{
 	struct arg_type_info *info;
 	int forward : 1;
 	int own_type : 1;
@@ -93,12 +98,13 @@ struct named_type {
 /* Initialize a named type INFO, which, if OWN_TYPE, is destroyed when
  * named_type_destroy is called.  */
 void named_type_init(struct named_type *named,
-		     struct arg_type_info *info, int own_type);
+					 struct arg_type_info *info, int own_type);
 
 void named_type_destroy(struct named_type *named);
 
 /* One prototype library.  */
-struct protolib {
+struct protolib
+{
 	/* Other libraries to look through if the definition is not
 	 * found here.  Note that due to the way imports are stored,
 	 * there is no way to distinguish where exactly (at which
@@ -130,21 +136,21 @@ int protolib_add_import(struct protolib *plib, struct protolib *import);
  * value on failure.  NAME is owned and released on PLIB destruction
  * if OWN_NAME.  */
 int protolib_add_prototype(struct protolib *plib,
-			   const char *name, int own_name,
-			   struct prototype *proto);
+						   const char *name, int own_name,
+						   struct prototype *proto);
 
 /* Add a named type NAMED to PLIB.  Returns 0 on success or a negative
  * value on failure.  NAME is owned and released on PLIB destruction
  * if OWN_NAME.  NAMED _pointer_ is copied to PLIB.  */
 int protolib_add_named_type(struct protolib *plib,
-			    const char *name, int own_name,
-			    struct named_type *named);
+							const char *name, int own_name,
+							struct named_type *named);
 
 /* Lookup prototype named NAME in PLIB.  If none is found and IMPORTS
  * is true, look recursively in each of the imports.  Returns the
  * corresponding prototype, or NULL if none was found.  */
 struct prototype *protolib_lookup_prototype(struct protolib *plib,
-					    const char *name, bool imports);
+											const char *name, bool imports);
 
 /* Add a named type NAMED to PLIB.  Returns 0 on success or a negative
  * value on failure.  */
@@ -154,7 +160,7 @@ int protolib_add_type(struct protolib *plib, struct named_type *named);
  * true, look recursively in each of the imports.  Returns the
  * corresponding type, or NULL if none was found.  */
 struct named_type *protolib_lookup_type(struct protolib *plib,
-					const char *name, bool imports);
+										const char *name, bool imports);
 
 /* A cache of prototype libraries.  Can load prototype libraries on
  * demand.
@@ -166,7 +172,8 @@ struct named_type *protolib_lookup_type(struct protolib *plib,
  * have a separate prototype cache, because the types will potentially
  * differ between the ABI's.  protolib cache would then naturally be
  * stored in the ABI object, when this is introduced.  */
-struct protolib_cache {
+struct protolib_cache
+{
 	/* Dictionary of filename->protolib*.  */
 	struct dict protolibs;
 
@@ -184,7 +191,7 @@ struct protolib_cache {
 /* Initialize CACHE.  Returns 0 on success or a negative value on
  * failure.  */
 int protolib_cache_init(struct protolib_cache *cache,
-			struct protolib *import);
+						struct protolib *import);
 
 /* Destroy CACHE.  */
 void protolib_cache_destroy(struct protolib_cache *cache);
@@ -215,8 +222,8 @@ void protolib_cache_destroy(struct protolib_cache *cache);
  * This function returns either the loaded protolib, or NULL when
  * there was an error.  */
 struct protolib *protolib_cache_load(struct protolib_cache *cache,
-				     const char *key, int own_key,
-				     bool allow_private);
+									 const char *key, int own_key,
+									 bool allow_private);
 
 /* This is similar to protolib_cache_load, except that if a protolib
  * is not found NULL is returned instead of a default module.
@@ -224,27 +231,27 @@ struct protolib *protolib_cache_load(struct protolib_cache *cache,
  * It returns 0 for success and a negative value for failure, and the
  * actual return value is passed via *RET.*/
 int protolib_cache_maybe_load(struct protolib_cache *cache,
-			      const char *key, int own_key,
-			      bool allow_private,
-			      struct protolib **ret);
+							  const char *key, int own_key,
+							  bool allow_private,
+							  struct protolib **ret);
 
 /* This is similar to protolib_cache_load, but instead of looking for
  * the file to load in directories, the filename is given.  */
 struct protolib *protolib_cache_file(struct protolib_cache *cache,
-				     const char *filename, int own_filename);
+									 const char *filename, int own_filename);
 
 /* This caches a default module.  This is what protolib_cache_load
  * calls if it fails to find the actual protolib.  Returns default
  * protolib or NULL if there was an error.  */
 struct protolib *protolib_cache_default(struct protolib_cache *cache,
-					const char *key, int own_key);
+										const char *key, int own_key);
 
 /* This is similar to protolib_cache_file, but the library to cache is
  * given in argument.  Returns 0 on success or a negative value on
  * failure.  PLIB is thereafter owned by CACHE.  */
 int protolib_cache_protolib(struct protolib_cache *cache,
-			    const char *filename, int own_filename,
-			    struct protolib *plib);
+							const char *filename, int own_filename,
+							struct protolib *plib);
 
 /* Single global prototype cache.
  *

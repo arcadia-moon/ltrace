@@ -20,6 +20,7 @@
 
 #ifndef LTRACE_H
 #define LTRACE_H
+#include "library.h"
 
 enum Event_type {
 	EVENT_NONE=0,
@@ -37,7 +38,8 @@ enum Event_type {
 	EVENT_LIBCALL,
 	EVENT_LIBRET,
 	EVENT_NEW,        /* in this case, proc is NULL */
-	EVENT_MAX
+	EVEMT_LIB_ADD,
+	EVENT_MAX,
 };
 typedef enum Event_type Event_type;
 
@@ -56,9 +58,12 @@ struct Event {
 };
 
 typedef void (*callback_func) (Event *);
+typedef int (*handler_library) (struct library_symbol *);
 
 extern void ltrace_init(int argc, char **argv);
 extern void ltrace_add_callback(callback_func f, Event_type type);
+extern void ltrace_library_add_handler(handler_library f);
+extern int library_load_handler(struct library_symbol *);
 extern void ltrace_main(void);
 
 #endif /* LTRACE_H */
