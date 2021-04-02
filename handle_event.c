@@ -756,7 +756,7 @@ handle_breakpoint(Event *event)
 	{
 		struct callstack_element *now_callstack = &event->proc->callstack[now_callstack_index];
 		struct library_symbol *libsym = now_callstack->c_un.libfunc;
-		if (strcmp(libsym->name, "dlmopen") == 0 && library_load_handler(libsym) == 1)
+		if (strcmp(libsym->name, "dlmopen") == 0)
 		{
 			struct arg_type_info dlmopen_arg_type = {.type = ARGTYPE_POINTER};
 			struct prototype func = {

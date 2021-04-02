@@ -53,27 +53,31 @@
  * have a bit delay
  */
 
-#define	MAX_DELAY	100000	/* 100000 microseconds = 0.1 seconds */
+#define MAX_DELAY 100000 /* 100000 microseconds = 0.1 seconds */
 
-#define PROC_PID_FILE(VAR, FORMAT, PID)		\
-	char VAR[strlen(FORMAT) + 6];		\
+#define PROC_PID_FILE(VAR, FORMAT, PID) \
+	char VAR[strlen(FORMAT) + 6];       \
 	sprintf(VAR, FORMAT, PID)
 
 /*
  * Returns a (malloc'd) file name corresponding to a running pid
  */
 char *
-pid2name(pid_t pid) {
-	if (!kill(pid, 0)) {
+pid2name(pid_t pid)
+{
+	if (!kill(pid, 0))
+	{
 		int delay = 0;
 
 		PROC_PID_FILE(proc_exe, "/proc/%d/exe", pid);
 
-		while (delay < MAX_DELAY) {
-			if (!access(proc_exe, F_OK)) {
+		while (delay < MAX_DELAY)
+		{
+			if (!access(proc_exe, F_OK))
+			{
 				return strdup(proc_exe);
 			}
-			delay += 1000;	/* 1 milisecond */
+			delay += 1000; /* 1 milisecond */
 		}
 	}
 	return NULL;
@@ -92,11 +96,12 @@ open_status_file(pid_t pid)
 }
 
 static char *
-find_line_starting(FILE * file, const char * prefix, size_t len)
+find_line_starting(FILE *file, const char *prefix, size_t len)
 {
-	char * line = NULL;
+	char *line = NULL;
 	size_t line_len = 0;
-	while (!feof(file)) {
+	while (!feof(file))
+	{
 		if (getline(&line, &line_len, file) < 0)
 			return NULL;
 		if (strncmp(line, prefix, len) == 0)
@@ -107,14 +112,15 @@ find_line_starting(FILE * file, const char * prefix, size_t len)
 
 static void
 each_line_starting(FILE *file, const char *prefix,
-		   enum callback_status (*cb)(const char *line,
-					      const char *prefix,
-					      void *data),
-		   void *data)
+				   enum callback_status (*cb)(const char *line,
+											  const char *prefix,
+											  void *data),
+				   void *data)
 {
 	size_t len = strlen(prefix);
-	char * line;
-	while ((line = find_line_starting(file, prefix, len)) != NULL) {
+	char *line;
+	while ((line = find_line_starting(file, prefix, len)) != NULL)
+	{
 		enum callback_status st = (*cb)(line, prefix, data);
 		free(line);
 		if (st == CBS_STOP)
@@ -125,17 +131,17 @@ each_line_starting(FILE *file, const char *prefix,
 static enum callback_status
 process_leader_cb(const char *line, const char *prefix, void *data)
 {
-	pid_t * pidp = data;
+	pid_t *pidp = data;
 	*pidp = atoi(line + strlen(prefix));
 	return CBS_STOP;
 }
 
-pid_t
-process_leader(pid_t pid)
+pid_t process_leader(pid_t pid)
 {
 	pid_t tgid = 0;
-	FILE * file = open_status_file(pid);
-	if (file != NULL) {
+	FILE *file = open_status_file(pid);
+	if (file != NULL)
+	{
 		each_line_starting(file, "Tgid:\t", &process_leader_cb, &tgid);
 		fclose(file);
 	}
@@ -152,14 +158,14 @@ process_stopped_cb(const char *line, const char *prefix, void *data)
 	return CBS_STOP;
 }
 
-int
-process_stopped(pid_t pid)
+int process_stopped(pid_t pid)
 {
 	int is_stopped = -1;
-	FILE * file = open_status_file(pid);
-	if (file != NULL) {
+	FILE *file = open_status_file(pid);
+	if (file != NULL)
+	{
 		each_line_starting(file, "State:\t", &process_stopped_cb,
-				   &is_stopped);
+						   &is_stopped);
 		fclose(file);
 	}
 	return is_stopped;
@@ -168,17 +174,22 @@ process_stopped(pid_t pid)
 static enum callback_status
 process_status_cb(const char *line, const char *prefix, void *data)
 {
-	const char * status = line + strlen(prefix);
+	const char *status = line + strlen(prefix);
 	const char c = *status;
 
-#define RETURN(C) do {					\
-		*(enum process_status *)data = C;	\
-		return CBS_STOP;			\
+#define RETURN(C)                         \
+	do                                    \
+	{                                     \
+		*(enum process_status *)data = C; \
+		return CBS_STOP;                  \
 	} while (0)
 
-	switch (c) {
-	case 'Z': RETURN(PS_ZOMBIE);
-	case 't': RETURN(PS_TRACING_STOP);
+	switch (c)
+	{
+	case 'Z':
+		RETURN(PS_ZOMBIE);
+	case 't':
+		RETURN(PS_TRACING_STOP);
 	case 'T':
 		/* This can be either "T (stopped)" or, for older
 		 * kernels, "T (tracing stop)".  */
@@ -186,14 +197,16 @@ process_status_cb(const char *line, const char *prefix, void *data)
 			RETURN(PS_STOP);
 		else if (!strcmp(status, "T (tracing stop)\n"))
 			RETURN(PS_TRACING_STOP);
-		else {
+		else
+		{
 			fprintf(stderr, "Unknown process status: %s",
-				status);
+					status);
 			RETURN(PS_STOP); /* Some sort of stop
 					  * anyway.  */
 		}
 	case 'D':
-	case 'S': RETURN(PS_SLEEPING);
+	case 'S':
+		RETURN(PS_SLEEPING);
 	}
 
 	RETURN(PS_OTHER);
@@ -204,15 +217,18 @@ enum process_status
 process_status(pid_t pid)
 {
 	enum process_status ret = PS_INVALID;
-	FILE * file = open_status_file(pid);
-	if (file != NULL) {
+	FILE *file = open_status_file(pid);
+	if (file != NULL)
+	{
 		each_line_starting(file, "State:\t", &process_status_cb, &ret);
 		fclose(file);
 		if (ret == PS_INVALID)
 			fprintf(stderr,
-				"Couldn't determine status of process %d: %s\n",
-				pid, strerror(errno));
-	} else {
+					"Couldn't determine status of process %d: %s\n",
+					pid, strerror(errno));
+	}
+	else
+	{
 		/* If the file is not present, the process presumably
 		 * exited already.  */
 		ret = PS_ZOMBIE;
@@ -229,8 +245,7 @@ all_digits(const char *str)
 	return !*str;
 }
 
-int
-process_tasks(pid_t pid, pid_t **ret_tasks, size_t *ret_n)
+int process_tasks(pid_t pid, pid_t **ret_tasks, size_t *ret_n)
 {
 	PROC_PID_FILE(fn, "/proc/%d/task", pid);
 	DIR *d = opendir(fn);
@@ -241,10 +256,12 @@ process_tasks(pid_t pid, pid_t **ret_tasks, size_t *ret_n)
 	size_t n = 0;
 	size_t alloc = 0;
 
-	while (1) {
+	while (1)
+	{
 		struct dirent *result;
 		result = readdir(d);
-		if (result != 0) {
+		if (result != 0)
+		{
 		fail:
 			free(tasks);
 			closedir(d);
@@ -252,12 +269,14 @@ process_tasks(pid_t pid, pid_t **ret_tasks, size_t *ret_n)
 		}
 		if (result == NULL)
 			break;
-		if (result->d_type == DT_DIR && all_digits(result->d_name)) {
+		if (result->d_type == DT_DIR && all_digits(result->d_name))
+		{
 			pid_t npid = atoi(result->d_name);
-			if (n >= alloc) {
+			if (n >= alloc)
+			{
 				alloc = alloc > 0 ? (2 * alloc) : 8;
 				pid_t *ntasks = realloc(tasks,
-							sizeof(*tasks) * alloc);
+										sizeof(*tasks) * alloc);
 				if (ntasks == NULL)
 					goto fail;
 				tasks = ntasks;
@@ -311,16 +330,14 @@ fetch_dyn32(struct process *proc, arch_addr_t *addr, Elf64_Dyn *ret)
 	return 0;
 }
 
-static int (*
-dyn_fetcher(struct process *proc))(struct process *,
-				   arch_addr_t *, Elf64_Dyn *)
+static int (*dyn_fetcher(struct process *proc))(struct process *,
+												arch_addr_t *, Elf64_Dyn *)
 {
 	return select_32_64(proc, fetch_dyn32, fetch_dyn64);
 }
 
-int
-proc_find_dynamic_entry_addr(struct process *proc, arch_addr_t src_addr,
-			     int d_tag, arch_addr_t *ret)
+int proc_find_dynamic_entry_addr(struct process *proc, arch_addr_t src_addr,
+								 int d_tag, arch_addr_t *ret)
 {
 	debug(DEBUG_FUNCTION, "find_dynamic_entry()");
 
@@ -328,18 +345,19 @@ proc_find_dynamic_entry_addr(struct process *proc, arch_addr_t src_addr,
 		return -1;
 
 	int i = 0;
-	while (1) {
+	while (1)
+	{
 		Elf64_Dyn entry;
-		if (dyn_fetcher(proc)(proc, &src_addr, &entry) < 0
-		    || entry.d_tag == DT_NULL
-		    || i++ > 100) { /* Arbitrary cut-off so that we
+		if (dyn_fetcher(proc)(proc, &src_addr, &entry) < 0 || entry.d_tag == DT_NULL || i++ > 100)
+		{ /* Arbitrary cut-off so that we
 				     * don't loop forever if the
 				     * binary is corrupted.  */
 			debug(2, "Couldn't find address for dtag!");
 			return -1;
 		}
 
-		if (entry.d_tag == d_tag) {
+		if (entry.d_tag == d_tag)
+		{
 			/* XXX The double cast should be removed when
 			 * arch_addr_t becomes integral type.  */
 			*ret = (arch_addr_t)(uintptr_t)entry.d_un.d_val;
@@ -353,20 +371,20 @@ proc_find_dynamic_entry_addr(struct process *proc, arch_addr_t src_addr,
  * definition in link.h, because that's only accurate for our host
  * architecture, not for target architecture (where the traced process
  * runs). */
-#define LT_LINK_MAP(BITS)			\
-	{					\
-		Elf##BITS##_Addr l_addr;	\
-		Elf##BITS##_Addr l_name;	\
-		Elf##BITS##_Addr l_ld;		\
-		Elf##BITS##_Addr l_next;	\
-		Elf##BITS##_Addr l_prev;	\
+#define LT_LINK_MAP(BITS)        \
+	{                            \
+		Elf##BITS##_Addr l_addr; \
+		Elf##BITS##_Addr l_name; \
+		Elf##BITS##_Addr l_ld;   \
+		Elf##BITS##_Addr l_next; \
+		Elf##BITS##_Addr l_prev; \
 	}
 struct lt_link_map_32 LT_LINK_MAP(32);
 struct lt_link_map_64 LT_LINK_MAP(64);
 
 static int
 fetch_lm64(struct process *proc, arch_addr_t addr,
-	   struct lt_link_map_64 *ret)
+		   struct lt_link_map_64 *ret)
 {
 	if (umovebytes(proc, addr, ret, sizeof(*ret)) != sizeof(*ret))
 		return -1;
@@ -375,7 +393,7 @@ fetch_lm64(struct process *proc, arch_addr_t addr,
 
 static int
 fetch_lm32(struct process *proc, arch_addr_t addr,
-	   struct lt_link_map_64 *ret)
+		   struct lt_link_map_64 *ret)
 {
 	struct lt_link_map_32 lm;
 	if (umovebytes(proc, addr, &lm, sizeof(lm)) != sizeof(lm))
@@ -390,21 +408,20 @@ fetch_lm32(struct process *proc, arch_addr_t addr,
 	return 0;
 }
 
-static int (*
-lm_fetcher(struct process *proc))(struct process *,
-				  arch_addr_t, struct lt_link_map_64 *)
+static int (*lm_fetcher(struct process *proc))(struct process *,
+											   arch_addr_t, struct lt_link_map_64 *)
 {
 	return select_32_64(proc, fetch_lm32, fetch_lm64);
 }
 
 /* The same as above holds for struct r_debug.  */
-#define LT_R_DEBUG(BITS)			\
-	{					\
-		int r_version;			\
-		Elf##BITS##_Addr r_map;		\
-		Elf##BITS##_Addr r_brk;		\
-		int r_state;			\
-		Elf##BITS##_Addr r_ldbase;	\
+#define LT_R_DEBUG(BITS)           \
+	{                              \
+		int r_version;             \
+		Elf##BITS##_Addr r_map;    \
+		Elf##BITS##_Addr r_brk;    \
+		int r_state;               \
+		Elf##BITS##_Addr r_ldbase; \
 	}
 
 struct lt_r_debug_32 LT_R_DEBUG(32);
@@ -412,7 +429,7 @@ struct lt_r_debug_64 LT_R_DEBUG(64);
 
 static int
 fetch_rd64(struct process *proc, arch_addr_t addr,
-	   struct lt_r_debug_64 *ret)
+		   struct lt_r_debug_64 *ret)
 {
 	if (umovebytes(proc, addr, ret, sizeof(*ret)) != sizeof(*ret))
 		return -1;
@@ -421,7 +438,7 @@ fetch_rd64(struct process *proc, arch_addr_t addr,
 
 static int
 fetch_rd32(struct process *proc, arch_addr_t addr,
-	   struct lt_r_debug_64 *ret)
+		   struct lt_r_debug_64 *ret)
 {
 	struct lt_r_debug_32 rd;
 	if (umovebytes(proc, addr, &rd, sizeof(rd)) != sizeof(rd))
@@ -436,9 +453,8 @@ fetch_rd32(struct process *proc, arch_addr_t addr,
 	return 0;
 }
 
-static int (*
-rdebug_fetcher(struct process *proc))(struct process *,
-				      arch_addr_t, struct lt_r_debug_64 *)
+static int (*rdebug_fetcher(struct process *proc))(struct process *,
+												   arch_addr_t, struct lt_r_debug_64 *)
 {
 	return select_32_64(proc, fetch_rd32, fetch_rd64);
 }
@@ -463,8 +479,7 @@ fetch_auxv32_entry(int fd, Elf64_auxv_t *ret)
 	return 0;
 }
 
-static int (*
-auxv_fetcher(struct process *proc))(int, Elf64_auxv_t *)
+static int (*auxv_fetcher(struct process *proc))(int, Elf64_auxv_t *)
 {
 	return select_32_64(proc, fetch_auxv32_entry, fetch_auxv64_entry);
 }
@@ -472,9 +487,10 @@ auxv_fetcher(struct process *proc))(int, Elf64_auxv_t *)
 static void
 crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 {
-	debug (DEBUG_FUNCTION, "crawl_linkmap()");
+	debug(DEBUG_FUNCTION, "crawl_linkmap()");
 
-	if (!dbg || !dbg->r_map) {
+	if (!dbg || !dbg->r_map)
+	{
 		debug(2, "Debug structure or it's linkmap are NULL!");
 		return;
 	}
@@ -483,9 +499,11 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 	 * arch_addr_t becomes integral type.  */
 	arch_addr_t addr = (arch_addr_t)(uintptr_t)dbg->r_map;
 
-	while (addr != 0) {
+	while (addr != 0)
+	{
 		struct lt_link_map_64 rlm = {};
-		if (lm_fetcher(proc)(proc, addr, &rlm) < 0) {
+		if (lm_fetcher(proc)(proc, addr, &rlm) < 0)
+		{
 			debug(2, "Unable to read link map");
 			return;
 		}
@@ -494,7 +512,8 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 		/* XXX The double cast should be removed when
 		 * arch_addr_t becomes integral type.  */
 		addr = (arch_addr_t)(uintptr_t)rlm.l_next;
-		if (rlm.l_name == 0) {
+		if (rlm.l_name == 0)
+		{
 			debug(2, "Name of mapped library is NULL");
 			return;
 		}
@@ -503,7 +522,7 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 		/* XXX The double cast should be removed when
 		 * arch_addr_t becomes integral type.  */
 		umovebytes(proc, (arch_addr_t)(uintptr_t)rlm.l_name,
-			   lib_name, sizeof(lib_name));
+				   lib_name, sizeof(lib_name));
 
 		/* Library name can be an empty string, in which case
 		 * the entry represents either the main binary, or a
@@ -520,11 +539,7 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 		 * for this).  We could load VDSO from process image
 		 * and at least compare actual SONAMEs.  For now, this
 		 * kludge is about the best that we can do.  */
-		if (*lib_name == 0
-		    || strcmp(lib_name, "linux-vdso.so.1") == 0
-		    || strcmp(lib_name, "linux-gate.so.1") == 0
-		    || strcmp(lib_name, "linux-vdso32.so.1") == 0
-		    || strcmp(lib_name, "linux-vdso64.so.1") == 0)
+		if (*lib_name == 0 || strcmp(lib_name, "linux-vdso.so.1") == 0 || strcmp(lib_name, "linux-gate.so.1") == 0 || strcmp(lib_name, "linux-vdso32.so.1") == 0 || strcmp(lib_name, "linux-vdso64.so.1") == 0)
 			continue;
 
 		/* Do we have that library already?  */
@@ -532,18 +547,20 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 			continue;
 
 		struct library *lib = malloc(sizeof(*lib));
-		if (lib == NULL) {
+		if (lib == NULL)
+		{
 		fail:
 			free(lib);
 			fprintf(stderr, "Couldn't load ELF object %s: %s\n",
-				lib_name, strerror(errno));
+					lib_name, strerror(errno));
 			continue;
 		}
 
 		if (library_init(lib, LT_LIBTYPE_DSO) < 0)
 			goto fail;
 
-		if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0) {
+		if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0)
+		{
 			library_destroy(lib);
 			goto fail;
 		}
@@ -556,9 +573,10 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 
 void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
 {
-	debug (DEBUG_FUNCTION, "crawl_linkmap_exclusive()");
+	debug(DEBUG_FUNCTION, "crawl_linkmap_exclusive()");
 
-	if (!r_map) {
+	if (!r_map)
+	{
 		debug(2, "Debug structure or it's linkmap are NULL!");
 		return;
 	}
@@ -567,9 +585,11 @@ void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
 	 * arch_addr_t becomes integral type.  */
 	arch_addr_t addr = r_map;
 
-	while (addr != 0) {
+	while (addr != 0)
+	{
 		struct lt_link_map_64 rlm = {};
-		if (lm_fetcher(proc)(proc, addr, &rlm) < 0) {
+		if (lm_fetcher(proc)(proc, addr, &rlm) < 0)
+		{
 			debug(2, "Unable to read link map");
 			return;
 		}
@@ -578,7 +598,8 @@ void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
 		/* XXX The double cast should be removed when
 		 * arch_addr_t becomes integral type.  */
 		addr = (arch_addr_t)(uintptr_t)rlm.l_next;
-		if (rlm.l_name == 0) {
+		if (rlm.l_name == 0)
+		{
 			debug(2, "Name of mapped library is NULL");
 			return;
 		}
@@ -587,7 +608,7 @@ void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
 		/* XXX The double cast should be removed when
 		 * arch_addr_t becomes integral type.  */
 		umovebytes(proc, (arch_addr_t)(uintptr_t)rlm.l_name,
-			   lib_name, sizeof(lib_name));
+				   lib_name, sizeof(lib_name));
 
 		/* Library name can be an empty string, in which case
 		 * the entry represents either the main binary, or a
@@ -604,35 +625,36 @@ void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
 		 * for this).  We could load VDSO from process image
 		 * and at least compare actual SONAMEs.  For now, this
 		 * kludge is about the best that we can do.  */
-		if (*lib_name == 0
-		    || strcmp(lib_name, "linux-vdso.so.1") == 0
-		    || strcmp(lib_name, "linux-gate.so.1") == 0
-		    || strcmp(lib_name, "linux-vdso32.so.1") == 0
-		    || strcmp(lib_name, "linux-vdso64.so.1") == 0)
+		if (*lib_name == 0 || strcmp(lib_name, "linux-vdso.so.1") == 0 || strcmp(lib_name, "linux-gate.so.1") == 0 || strcmp(lib_name, "linux-vdso32.so.1") == 0 || strcmp(lib_name, "linux-vdso64.so.1") == 0)
 			continue;
 
-		/* Do we have that library already?  */
-		if (proc_each_library(proc, NULL, library_with_key_cb, &key))
-			continue;
+		if (library_load_handler(lib_name) == 1)
+		{
+			/* Do we have that library already?  */
+			if (proc_each_library(proc, NULL, library_with_key_cb, &key))
+				continue;
 
-		struct library *lib = malloc(sizeof(*lib));
-		if (lib == NULL) {
-		fail:
-			free(lib);
-			fprintf(stderr, "Couldn't load ELF object %s: %s\n",
-				lib_name, strerror(errno));
-			continue;
+			struct library *lib = malloc(sizeof(*lib));
+			if (lib == NULL)
+			{
+			fail:
+				free(lib);
+				fprintf(stderr, "Couldn't load ELF object %s: %s\n",
+						lib_name, strerror(errno));
+				continue;
+			}
+
+			if (library_init(lib, LT_LIBTYPE_DSO) < 0)
+				goto fail;
+
+			if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0)
+			{
+				library_destroy(lib);
+				goto fail;
+			}
+			lib->key = key;
+			proc_add_library(proc, lib);
 		}
-
-		if (library_init(lib, LT_LIBTYPE_DSO) < 0)
-			goto fail;
-
-		if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0) {
-			library_destroy(lib);
-			goto fail;
-		}
-		lib->key = key;
-		proc_add_library(proc, lib);
 	}
 	return;
 }
@@ -642,7 +664,8 @@ load_debug_struct(struct process *proc, struct lt_r_debug_64 *ret)
 {
 	debug(DEBUG_FUNCTION, "load_debug_struct");
 
-	if (rdebug_fetcher(proc)(proc, proc->os.debug_addr, ret) < 0) {
+	if (rdebug_fetcher(proc)(proc, proc->os.debug_addr, ret) < 0)
+	{
 		debug(2, "This process does not have a debug structure!");
 		return -1;
 	}
@@ -656,14 +679,17 @@ rdebug_bp_on_hit(struct breakpoint *bp, struct process *proc)
 	debug(DEBUG_FUNCTION, "arch_check_dbg");
 
 	struct lt_r_debug_64 rdbg;
-	if (load_debug_struct(proc, &rdbg) < 0) {
+	if (load_debug_struct(proc, &rdbg) < 0)
+	{
 		debug(2, "Unable to load debug structure!");
 		return;
 	}
 
-	if (rdbg.r_state == RT_CONSISTENT) {
+	if (rdbg.r_state == RT_CONSISTENT)
+	{
 		debug(2, "Linkmap is now consistent");
-		switch (proc->os.debug_state) {
+		switch (proc->os.debug_state)
+		{
 		case RT_ADD:
 			debug(2, "Adding DSO to linkmap");
 			crawl_linkmap(proc, &rdbg);
@@ -681,27 +707,27 @@ rdebug_bp_on_hit(struct breakpoint *bp, struct process *proc)
 }
 
 #ifndef ARCH_HAVE_FIND_DL_DEBUG
-int
-arch_find_dl_debug(struct process *proc, arch_addr_t dyn_addr,
-		   arch_addr_t *ret)
+int arch_find_dl_debug(struct process *proc, arch_addr_t dyn_addr,
+					   arch_addr_t *ret)
 {
 	return proc_find_dynamic_entry_addr(proc, dyn_addr, DT_DEBUG, ret);
 }
 #endif
 
-int
-linkmap_init(struct process *proc, arch_addr_t dyn_addr)
+int linkmap_init(struct process *proc, arch_addr_t dyn_addr)
 {
 	debug(DEBUG_FUNCTION, "linkmap_init(%d, dyn_addr=%p)", proc->pid, dyn_addr);
 
-	if (arch_find_dl_debug(proc, dyn_addr, &proc->os.debug_addr) == -1) {
+	if (arch_find_dl_debug(proc, dyn_addr, &proc->os.debug_addr) == -1)
+	{
 		debug(2, "Couldn't find debug structure!");
 		return -1;
 	}
 
 	int status;
 	struct lt_r_debug_64 rdbg;
-	if ((status = load_debug_struct(proc, &rdbg)) < 0) {
+	if ((status = load_debug_struct(proc, &rdbg)) < 0)
+	{
 		debug(2, "No debug structure or no memory to allocate one!");
 		return status;
 	}
@@ -715,15 +741,18 @@ linkmap_init(struct process *proc, arch_addr_t dyn_addr)
 		return -1;
 
 	struct breakpoint *rdebug_bp = insert_breakpoint_at(proc, addr, NULL);
-	if (rdebug_bp == NULL) {
+	if (rdebug_bp == NULL)
+	{
 		/* This is not fatal, the tracing can continue with
 		 * reduced functionality.  */
 		fprintf(stderr,
-			"Couldn't insert _r_debug breakpoint to %d: %s.\n"
-			"As a result of that, ltrace will not be able to "
-			"detect and trace\nnewly-loaded libraries.\n",
-			proc->pid, strerror(errno));
-	} else {
+				"Couldn't insert _r_debug breakpoint to %d: %s.\n"
+				"As a result of that, ltrace will not be able to "
+				"detect and trace\nnewly-loaded libraries.\n",
+				proc->pid, strerror(errno));
+	}
+	else
+	{
 		static struct bp_callbacks rdebug_callbacks = {
 			.on_hit = rdebug_bp_on_hit,
 		};
@@ -733,32 +762,30 @@ linkmap_init(struct process *proc, arch_addr_t dyn_addr)
 	return 0;
 }
 
-int
-task_kill (pid_t pid, int sig)
+int task_kill(pid_t pid, int sig)
 {
 	// Taken from GDB
-        int ret;
+	int ret;
 
-        errno = 0;
-        ret = syscall (__NR_tkill, pid, sig);
+	errno = 0;
+	ret = syscall(__NR_tkill, pid, sig);
 	return ret;
 }
 
-void
-process_removed(struct process *proc)
+void process_removed(struct process *proc)
 {
 	delete_events_for(proc);
 }
 
-int
-process_get_entry(struct process *proc,
-		  arch_addr_t *entryp,
-		  arch_addr_t *interp_biasp)
+int process_get_entry(struct process *proc,
+					  arch_addr_t *entryp,
+					  arch_addr_t *interp_biasp)
 {
 	PROC_PID_FILE(fn, "/proc/%d/auxv", proc->pid);
 	int fd = open(fn, O_RDONLY);
 	int ret = 0;
-	if (fd == -1) {
+	if (fd == -1)
+	{
 	fail:
 		fprintf(stderr, "couldn't read %s: %s", fn, strerror(errno));
 		ret = -1;
@@ -770,12 +797,14 @@ process_get_entry(struct process *proc,
 
 	arch_addr_t at_entry = 0;
 	arch_addr_t at_bias = 0;
-	while (1) {
+	while (1)
+	{
 		Elf64_auxv_t entry = {};
 		if (auxv_fetcher(proc)(fd, &entry) < 0)
 			goto fail;
 
-		switch (entry.a_type) {
+		switch (entry.a_type)
+		{
 		case AT_BASE:
 			/* XXX The double cast should be removed when
 			 * arch_addr_t becomes integral type.  */
@@ -802,28 +831,24 @@ process_get_entry(struct process *proc,
 	goto done;
 }
 
-int
-os_process_init(struct process *proc)
+int os_process_init(struct process *proc)
 {
 	proc->os.debug_addr = 0;
 	proc->os.debug_state = 0;
 	return 0;
 }
 
-void
-os_process_destroy(struct process *proc)
+void os_process_destroy(struct process *proc)
 {
 }
 
-int
-os_process_clone(struct process *retp, struct process *proc)
+int os_process_clone(struct process *retp, struct process *proc)
 {
 	retp->os = proc->os;
 	return 0;
 }
 
-int
-os_process_exec(struct process *proc)
+int os_process_exec(struct process *proc)
 {
 	return 0;
 }

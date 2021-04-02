@@ -168,11 +168,11 @@ void ltrace_library_add_handler(handler_library func)
 	ltrace_handler[num_ltrace_handlers++] = func;
 }
 
-int library_load_handler(struct library_symbol *lib)
+int library_load_handler(char *libname)
 {
 	for (int i = 0; i < num_ltrace_handlers; i++)
 	{
-		return ltrace_handler[i](lib);
+		return ltrace_handler[i](libname);
 	}
 	return 1;
 }

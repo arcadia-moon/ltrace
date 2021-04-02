@@ -58,12 +58,12 @@ struct Event {
 };
 
 typedef void (*callback_func) (Event *);
-typedef int (*handler_library) (struct library_symbol *);
+typedef int (*handler_library) (char *);
 
 extern void ltrace_init(int argc, char **argv);
 extern void ltrace_add_callback(callback_func f, Event_type type);
 extern void ltrace_library_add_handler(handler_library f);
-extern int library_load_handler(struct library_symbol *);
+extern int library_load_handler(char *);
 extern void ltrace_main(void);
 
 #endif /* LTRACE_H */
