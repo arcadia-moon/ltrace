@@ -766,7 +766,8 @@ handle_breakpoint(Event *event)
 			struct value retval;
 			bool own_retval = false;
 			value_init(&retval, event->proc, NULL, func.return_info, 0);
-			if (fetch_retval(now_callstack->fetch_context, LT_TOF_FUNCTIONR, event->proc, func.return_info, &retval) >= 0)
+			struct fetch_context *fetch_context = fetch_arg_init(LT_TOF_FUNCTION, event->proc, func.return_info);
+			if (fetch_retval(fetch_context, LT_TOF_FUNCTIONR, event->proc, func.return_info, &retval) >= 0)
 			{
 				own_retval = true;
 				crawl_linkmap_exclusive(event->proc, (void *)retval.u.value);
