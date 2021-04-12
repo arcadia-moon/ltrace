@@ -106,56 +106,10 @@ normal_exit(void)
 	}
 }
 
-void ltrace_init(int argc, char **argv)
-{
-	setlocale(LC_ALL, "");
-
-	struct opt_p_t *opt_p_tmp;
-
-	atexit(normal_exit);
-	signal(SIGINT, signal_exit);  /* Detach processes when interrupted */
-	signal(SIGTERM, signal_exit); /*  ... or killed */
-
-	argv = process_options(argc, argv);
-	init_global_config();
-
-	if (command)
-	{
-		/* Check that the binary ABI is supported before
-		 * calling execute_program.  */
-		{
-			struct ltelf lte;
-			if (ltelf_init(&lte, command) == 0)
-				ltelf_destroy(&lte);
-			else
-				exit(EXIT_FAILURE);
-		}
-
-		pid_t pid = execute_program(command, argv);
-		struct process *proc = open_program(command, pid);
-		if (proc == NULL)
-		{
-			fprintf(stderr, "couldn't open program '%s': %s\n",
-					command, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-
-		trace_set_options(proc);
-		continue_process(pid);
-	}
-	opt_p_tmp = opt_p;
-	while (opt_p_tmp)
-	{
-		open_pid(opt_p_tmp->pid);
-		opt_p_tmp = opt_p_tmp->next;
-	}
-}
-
 static int num_ltrace_callbacks[EVENT_MAX];
 static int num_ltrace_handlers;
 static callback_func *ltrace_callbacks[EVENT_MAX];
 static handler_library *ltrace_handler;
-
 void ltrace_add_callback(callback_func func, Event_type type)
 {
 	ltrace_callbacks[type] = realloc(ltrace_callbacks[type], (num_ltrace_callbacks[type] + 1) * sizeof(callback_func));
@@ -195,6 +149,49 @@ dispatch_callbacks(Event *ev)
 	for (i = 0; i < num_ltrace_callbacks[ev->type]; i++)
 	{
 		ltrace_callbacks[ev->type][i](ev);
+	}
+}
+void ltrace_init(int argc, char **argv)
+{
+	setlocale(LC_ALL, "");
+
+	struct opt_p_t *opt_p_tmp;
+
+	atexit(normal_exit);
+	signal(SIGINT, signal_exit);  /* Detach processes when interrupted */
+	signal(SIGTERM, signal_exit); /*  ... or killed */
+
+	argv = process_options(argc, argv);
+	init_global_config();
+
+	if (command)
+	{
+		/* Check that the binary ABI is supported before
+		 * calling execute_program.  */
+		struct ltelf lte;
+		{
+			if (ltelf_init(&lte, command) == 0)
+				ltelf_destroy(&lte);
+			else
+				exit(EXIT_FAILURE);
+		}
+
+		pid_t pid = execute_program(command, argv);
+		struct process *proc = open_program(command, pid);
+		if (proc == NULL)
+		{
+			fprintf(stderr, "couldn't open program '%s': %s\n",
+					command, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		trace_set_options(proc);
+		continue_process(pid);
+	}
+	opt_p_tmp = opt_p;
+	while (opt_p_tmp)
+	{
+		open_pid(opt_p_tmp->pid);
+		opt_p_tmp = opt_p_tmp->next;
 	}
 }
 

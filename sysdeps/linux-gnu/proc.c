@@ -483,7 +483,13 @@ static int (*auxv_fetcher(struct process *proc))(int, Elf64_auxv_t *)
 {
 	return select_32_64(proc, fetch_auxv32_entry, fetch_auxv64_entry);
 }
-
+static enum callback_status
+set_library_symbol(struct library_symbol *libsym, void *data)
+{
+	libsym->delayed = 0;
+	libsym->latent = 0;
+	return CBS_CONT;
+}
 static void
 crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 {
@@ -541,7 +547,6 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 		 * kludge is about the best that we can do.  */
 		if (*lib_name == 0 || strcmp(lib_name, "linux-vdso.so.1") == 0 || strcmp(lib_name, "linux-gate.so.1") == 0 || strcmp(lib_name, "linux-vdso32.so.1") == 0 || strcmp(lib_name, "linux-vdso64.so.1") == 0)
 			continue;
-
 		/* Do we have that library already?  */
 		if (proc_each_library(proc, NULL, library_with_key_cb, &key))
 			continue;
@@ -566,7 +571,19 @@ crawl_linkmap(struct process *proc, struct lt_r_debug_64 *dbg)
 		}
 
 		lib->key = key;
-		proc_add_library(proc, lib);
+
+		if (library_load_handler(lib_name) == 1)
+		{
+			struct library_symbol *libsym = NULL;
+			while ((libsym = library_each_symbol(lib, libsym, set_library_symbol, proc)) != NULL)
+				;
+
+			proc_add_library(proc, lib);
+		}
+		else
+		{
+			free(lib);
+		}
 	}
 	return;
 }
@@ -627,33 +644,40 @@ void crawl_linkmap_exclusive(struct process *proc, arch_addr_t r_map)
 		 * kludge is about the best that we can do.  */
 		if (*lib_name == 0 || strcmp(lib_name, "linux-vdso.so.1") == 0 || strcmp(lib_name, "linux-gate.so.1") == 0 || strcmp(lib_name, "linux-vdso32.so.1") == 0 || strcmp(lib_name, "linux-vdso64.so.1") == 0)
 			continue;
+		/* Do we have that library already?  */
+		if (proc_each_library(proc, NULL, library_with_key_cb, &key))
+			continue;
 
+		struct library *lib = malloc(sizeof(*lib));
+		if (lib == NULL)
+		{
+		fail:
+			free(lib);
+			fprintf(stderr, "Couldn't load ELF object %s: %s\n",
+					lib_name, strerror(errno));
+			continue;
+		}
+
+		if (library_init(lib, LT_LIBTYPE_DSO) < 0)
+			goto fail;
+
+		if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0)
+		{
+			library_destroy(lib);
+			goto fail;
+		}
+		lib->key = key;
 		if (library_load_handler(lib_name) == 1)
 		{
-			/* Do we have that library already?  */
-			if (proc_each_library(proc, NULL, library_with_key_cb, &key))
-				continue;
+			struct library_symbol *libsym = NULL;
+			while ((libsym = library_each_symbol(lib, libsym, set_library_symbol, proc)) != NULL)
+				;
 
-			struct library *lib = malloc(sizeof(*lib));
-			if (lib == NULL)
-			{
-			fail:
-				free(lib);
-				fprintf(stderr, "Couldn't load ELF object %s: %s\n",
-						lib_name, strerror(errno));
-				continue;
-			}
-
-			if (library_init(lib, LT_LIBTYPE_DSO) < 0)
-				goto fail;
-
-			if (ltelf_read_library(lib, proc, lib_name, rlm.l_addr) < 0)
-			{
-				library_destroy(lib);
-				goto fail;
-			}
-			lib->key = key;
 			proc_add_library(proc, lib);
+		}
+		else
+		{
+			free(lib);
 		}
 	}
 	return;

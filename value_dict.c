@@ -21,7 +21,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
-
+#include <stdio.h>
 #include "value_dict.h"
 #include "value.h"
 

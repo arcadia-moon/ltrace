@@ -335,7 +335,6 @@ lookup_symbol_prototype(struct process *proc, struct library_symbol *libsym)
 		if (data.ret != NULL)
 			return data.ret;
 	}
-
 	return build_default_prototype();
 }
 

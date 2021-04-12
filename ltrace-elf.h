@@ -38,7 +38,8 @@
  * use should be move to struct library, and the rest of this
  * structure maybe could be safely hidden in .c.  How to integrate the
  * arch-specific bits into struct library is unclear as of now.  */
-struct ltelf {
+struct ltelf
+{
 	int fd;
 	Elf *elf;
 	GElf_Ehdr ehdr;
@@ -75,7 +76,7 @@ void ltelf_destroy(struct ltelf *lte);
  * pseudo-libraries?  For now we assume that all libraries can be
  * opened via a filesystem.  BASE is ignored for ET_EXEC files.  */
 int ltelf_read_library(struct library *lib, struct process *proc,
-		       const char *filename, GElf_Addr bias);
+					   const char *filename, GElf_Addr bias);
 
 /* Create a library object representing the main binary.  The entry
  * point address is stored to *ENTRYP.  */
@@ -94,8 +95,8 @@ struct library *ltelf_read_main_binary(struct process *proc, const char *path);
  * next.  If that returns PLT_DEFAULT, default_elf_add_plt_entry is
  * called.  */
 int elf_add_plt_entry(struct process *proc, struct ltelf *lte,
-		      const char *name, GElf_Rela *rela, size_t idx,
-		      struct library_symbol **ret);
+					  const char *name, GElf_Rela *rela, size_t idx,
+					  struct library_symbol **ret);
 
 /* Create a default PLT entry.  This can be used instead (or in
  * addition to) returning PLT_DEFAULT from arch_elf_add_plt_entry.
@@ -105,8 +106,8 @@ int elf_add_plt_entry(struct process *proc, struct ltelf *lte,
  * symbol internals to its liking, and then return either PLT_DEFAULT
  * or PLT_OK.  */
 int default_elf_add_plt_entry(struct process *proc, struct ltelf *lte,
-			      const char *a_name, GElf_Rela *rela, size_t ndx,
-			      struct library_symbol **ret);
+							  const char *a_name, GElf_Rela *rela, size_t ndx,
+							  struct library_symbol **ret);
 
 Elf_Data *elf_loaddata(Elf_Scn *scn, GElf_Shdr *shdr);
 
@@ -116,28 +117,30 @@ Elf_Data *elf_loaddata(Elf_Scn *scn, GElf_Shdr *shdr);
  * header is stored to TGT_SHDR.  If it wasn't found, *TGT_SEC is set
  * to NULL.  */
 int elf_get_section_covering(struct ltelf *lte, GElf_Addr addr,
-			     Elf_Scn **tgt_sec, GElf_Shdr *tgt_shdr);
+							 Elf_Scn **tgt_sec, GElf_Shdr *tgt_shdr);
 int elf_get_section_type(struct ltelf *lte, GElf_Word type,
-			 Elf_Scn **tgt_sec, GElf_Shdr *tgt_shdr);
+						 Elf_Scn **tgt_sec, GElf_Shdr *tgt_shdr);
 int elf_get_section_named(struct ltelf *lte, const char *name,
-			  Elf_Scn **tgt_sec, GElf_Shdr *tgt_shdr);
+						  Elf_Scn **tgt_sec, GElf_Shdr *tgt_shdr);
 
 /* Iterate through all symbols in LTE.  See callback.h for notes on
  * iteration interfaces.  START_AFTER is 0 in initial call.  */
-struct elf_each_symbol_t {
+struct elf_each_symbol_t
+{
 	unsigned restart;
 	int status;
-} elf_each_symbol(struct ltelf *lte, unsigned start_after,
-		  enum callback_status (*cb)(GElf_Sym *symbol,
-					     const char *name,
-					     void *data),
-		  void *data);
+};
+struct elf_each_symbol_t elf_each_symbol(struct ltelf *lte, unsigned start_after,
+				  enum callback_status (*cb)(GElf_Sym *symbol,
+											 const char *name,
+											 void *data),
+				  void *data);
 
 /* Read relocations from relocation section SCN with header SHDR and
  * add them to RELA_VEC, which is a vector of GElf_Rela.  Return 0 on
  * success, or a negative value on failure.  */
 int elf_read_relocs(struct ltelf *lte, Elf_Scn *scn, GElf_Shdr *shdr,
-		    struct vect *rela_vec);
+					struct vect *rela_vec);
 
 /* Read a given DT_ TAG from LTE.  Value is returned in *VALUEP.
  * Returns 0 on success or a negative value on failure.  */
@@ -168,11 +171,11 @@ int elf_can_read_next(Elf_Data *data, GElf_Xword offset, GElf_Xword amount);
 
 void delete_symbol_chain(struct library_symbol *);
 #if __WORDSIZE == 32
-#define PRI_ELF_ADDR		PRIx32
-#define GELF_ADDR_CAST(x)	(void *)(uint32_t)(x)
+#define PRI_ELF_ADDR PRIx32
+#define GELF_ADDR_CAST(x) (void *)(uint32_t)(x)
 #else
-#define PRI_ELF_ADDR		PRIx64
-#define GELF_ADDR_CAST(x)	(void *)(x)
+#define PRI_ELF_ADDR PRIx64
+#define GELF_ADDR_CAST(x) (void *)(x)
 #endif
 
 #endif

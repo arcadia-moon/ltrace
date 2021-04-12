@@ -29,12 +29,12 @@
 #include <stdint.h>
 
 #if defined(HAVE_LIBDW)
-# include <elfutils/libdwfl.h>
+#include <elfutils/libdwfl.h>
 #endif
 
 #if defined(HAVE_LIBUNWIND)
-# include <libunwind.h>
-# include <libunwind-ptrace.h>
+#include <libunwind.h>
+#include <libunwind-ptrace.h>
 #endif /* defined(HAVE_LIBUNWIND) */
 
 #include "ltrace.h"
@@ -43,7 +43,8 @@
 #include "callback.h"
 #include "forward.h"
 
-struct event_handler {
+struct event_handler
+{
 	/* Event handler that overrides the default one.  Should
 	 * return NULL if the event was handled, otherwise the
 	 * returned event is passed to the default handler.  */
@@ -53,21 +54,25 @@ struct event_handler {
 	void (*destroy)(struct event_handler *self);
 };
 
-enum process_state {
+enum process_state
+{
 	STATE_ATTACHED = 0,
 	STATE_BEING_CREATED,
-	STATE_IGNORED  /* ignore this process (it's a fork and no -f was used) */
+	STATE_IGNORED /* ignore this process (it's a fork and no -f was used) */
 };
 
-struct output_state {
+struct output_state
+{
 	size_t params_left;
 	int need_delim;
 };
 
-struct callstack_element {
-	union {
+struct callstack_element
+{
+	union
+	{
 		int syscall;
-		struct library_symbol * libfunc;
+		struct library_symbol *libfunc;
 	} c_un;
 	int is_syscall;
 	arch_addr_t return_addr;
@@ -84,10 +89,11 @@ struct callstack_element {
  * have struct process for the whole group and struct task (or struct
  * lwp, struct thread) for what's there for per-thread stuff.  But for
  * now this is the less invasive way of structuring it.  */
-struct process {
+struct process
+{
 	enum process_state state;
-	struct process *parent;         /* needed by STATE_BEING_CREATED */
-	char * filename;
+	struct process *parent; /* needed by STATE_BEING_CREATED */
+	char *filename;
 	pid_t pid;
 
 	/* Dictionary of breakpoints (which is a mapping
@@ -95,9 +101,9 @@ struct process {
 	 * processes.  */
 	struct dict *breakpoints;
 
-	int mask_32bit;           /* 1 if 64-bit ltrace is tracing 32-bit process */
+	int mask_32bit; /* 1 if 64-bit ltrace is tracing 32-bit process */
 	unsigned int personality;
-	int tracesysgood;         /* signal indicating a PTRACE_SYSCALL trap */
+	int tracesysgood; /* signal indicating a PTRACE_SYSCALL trap */
 
 	size_t callstack_depth;
 	struct callstack_element callstack[MAX_CALLDEPTH];
@@ -107,9 +113,9 @@ struct process {
 	struct library *libraries;
 
 	/* Arch-dependent: */
-	void * instruction_pointer;
-	void * stack_pointer;      /* To get return addr, args... */
-	void * arch_ptr;
+	void *instruction_pointer;
+	void *stack_pointer; /* To get return addr, args... */
+	void *arch_ptr;
 
 	/* XXX We would like to replace this with a pointer to ABI
 	 * object that would provide the relevant services, instead of
@@ -184,16 +190,16 @@ int process_clone(struct process *retp, struct process *proc, pid_t pid);
  * are considered to be processes for the purpose of this iterator.
  * See callback.h for notes on iteration interfaces.  */
 struct process *each_process(struct process *start_after,
-			     enum callback_status (*cb)(struct process *proc,
-							void *data),
-			     void *data);
+							 enum callback_status (*cb)(struct process *proc,
+														void *data),
+							 void *data);
 
 /* Iterate through list of tasks of given process PROC.  See
  * callback.h for notes on iteration interfaces.  */
 struct process *each_task(struct process *proc, struct process *start_after,
-			  enum callback_status (*cb)(struct process *proc,
-						     void *data),
-			  void *data);
+						  enum callback_status (*cb)(struct process *proc,
+													 void *data),
+						  void *data);
 
 void change_process_leader(struct process *proc, struct process *leader);
 
@@ -221,20 +227,20 @@ int proc_remove_library(struct process *proc, struct library *lib);
  * is both latent and delayed, this will not enable the corresponding
  * breakpoint.  */
 int proc_activate_delayed_symbol(struct process *proc,
-				 struct library_symbol *libsym);
+								 struct library_symbol *libsym);
 
 /* Iterate through the libraries of PROC.  See callback.h for notes on
  * iteration interfaces.  */
 struct library *proc_each_library(struct process *proc,
-				  struct library *start_after,
-				  enum callback_status (*cb)(struct process *p,
-							     struct library *l,
-							     void *data),
-				  void *data);
+								  struct library *start_after,
+								  enum callback_status (*cb)(struct process *p,
+															 struct library *l,
+															 void *data),
+								  void *data);
 
 /* Insert BP into PROC.  */
 int proc_add_breakpoint(struct process *proc, struct breakpoint *bp);
-
+int breakpoint_for_symbol(struct library_symbol *libsym, struct process *proc);
 /* Remove BP from PROC.  This has no reason to fail in runtime.  If it
  * does not find BP in PROC, it's hard error guarded by assertion.  */
 void proc_remove_breakpoint(struct process *proc, struct breakpoint *bp);
@@ -242,31 +248,29 @@ void proc_remove_breakpoint(struct process *proc, struct breakpoint *bp);
 /* Iterate through the breakpoints of PROC.  See callback.h for notes
  * on iteration interfaces.  */
 arch_addr_t *proc_each_breakpoint(struct process *proc, arch_addr_t *start,
-				  enum callback_status (*cb)
-					(struct process *proc,
-					 struct breakpoint *bp,
-					 void *data),
-				  void *data);
+								  enum callback_status (*cb)(struct process *proc,
+															 struct breakpoint *bp,
+															 void *data),
+								  void *data);
 
 /* Iterate through the dynamic section at src_addr looking for D_TAG.
  * If tag is found, fill it's value in RET and return 0.
  * If tag is not found, return a negative value.  */
 int proc_find_dynamic_entry_addr(struct process *proc, arch_addr_t src_addr,
-				 int d_tag, arch_addr_t *ret);
+								 int d_tag, arch_addr_t *ret);
 
 /* Finds a symbol corresponding to LIBSYM in a process PROC.  Returns
  * 0 and sets *RETLIB and *RETSYM if the corresponding pointer is
  * non-NULL.  Returns a negative value when the symbols couldn't be
  * found.  */
 int proc_find_symbol(struct process *proc, struct library_symbol *sym,
-		     struct library **retlib, struct library_symbol **retsym);
+					 struct library **retlib, struct library_symbol **retsym);
 
 /* Iterate through all symbols in all libraries of PROC.  See
  * callback.h for notes on this interface.  */
-struct library_symbol *proc_each_symbol
-	(struct process *proc, struct library_symbol *start_after,
-	 enum callback_status (*cb)(struct library_symbol *, void *),
-	 void *data);
+struct library_symbol *proc_each_symbol(struct process *proc, struct library_symbol *start_after,
+										enum callback_status (*cb)(struct library_symbol *, void *),
+										void *data);
 
 /* Read 8, 16, 32 or 64-bit quantity located at ADDR in PROC.  The
  * resulting value is stored in *LP.  0 is returned on success or a

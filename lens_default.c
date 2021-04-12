@@ -223,12 +223,6 @@ format_floating(FILE *stream, struct value *value, struct value_dict *arguments,
 	}
 }
 
-struct format_argument_data
-{
-	struct value *value;
-	struct value_dict *arguments;
-};
-
 static int
 format_argument_cb(FILE *stream, void *ptr)
 {

@@ -41,34 +41,30 @@
 #include "proc.h"
 
 #ifndef ARCH_HAVE_TRANSLATE_ADDRESS
-int
-arch_translate_address_dyn(struct process *proc,
-		       arch_addr_t addr, arch_addr_t *ret)
+int arch_translate_address_dyn(struct process *proc,
+							   arch_addr_t addr, arch_addr_t *ret)
 {
 	*ret = addr;
 	return 0;
 }
 
 struct ltelf;
-int
-arch_translate_address(struct ltelf *lte,
-		       arch_addr_t addr, arch_addr_t *ret)
+int arch_translate_address(struct ltelf *lte,
+						   arch_addr_t addr, arch_addr_t *ret)
 {
 	*ret = addr;
 	return 0;
 }
 #endif
 
-void
-breakpoint_on_hit(struct breakpoint *bp, struct process *proc)
+void breakpoint_on_hit(struct breakpoint *bp, struct process *proc)
 {
 	assert(bp != NULL);
 	if (bp->cbs != NULL && bp->cbs->on_hit != NULL)
 		(bp->cbs->on_hit)(bp, proc);
 }
 
-void
-breakpoint_on_continue(struct breakpoint *bp, struct process *proc)
+void breakpoint_on_continue(struct breakpoint *bp, struct process *proc)
 {
 	assert(bp != NULL);
 	if (bp->cbs != NULL && bp->cbs->on_continue != NULL)
@@ -77,25 +73,22 @@ breakpoint_on_continue(struct breakpoint *bp, struct process *proc)
 		continue_after_breakpoint(proc, bp);
 }
 
-void
-breakpoint_on_retract(struct breakpoint *bp, struct process *proc)
+void breakpoint_on_retract(struct breakpoint *bp, struct process *proc)
 {
 	assert(bp != NULL);
 	if (bp->cbs != NULL && bp->cbs->on_retract != NULL)
 		(bp->cbs->on_retract)(bp, proc);
 }
 
-void
-breakpoint_on_install(struct breakpoint *bp, struct process *proc)
+void breakpoint_on_install(struct breakpoint *bp, struct process *proc)
 {
 	assert(bp != NULL);
 	if (bp->cbs != NULL && bp->cbs->on_install != NULL)
 		(bp->cbs->on_install)(bp, proc);
 }
 
-int
-breakpoint_get_return_bp(struct breakpoint **ret,
-			 struct breakpoint *bp, struct process *proc)
+int breakpoint_get_return_bp(struct breakpoint **ret,
+							 struct breakpoint *bp, struct process *proc)
 {
 	assert(bp != NULL);
 	if (bp->cbs != NULL && bp->cbs->get_return_bp != NULL)
@@ -124,38 +117,32 @@ address2bpstruct(struct process *proc, arch_addr_t addr)
 }
 
 #ifndef OS_HAVE_BREAKPOINT_DATA
-int
-os_breakpoint_init(struct process *proc, struct breakpoint *sbp)
+int os_breakpoint_init(struct process *proc, struct breakpoint *sbp)
 {
 	return 0;
 }
 
-void
-os_breakpoint_destroy(struct breakpoint *sbp)
+void os_breakpoint_destroy(struct breakpoint *sbp)
 {
 }
 
-int
-os_breakpoint_clone(struct breakpoint *retp, struct breakpoint *sbp)
+int os_breakpoint_clone(struct breakpoint *retp, struct breakpoint *sbp)
 {
 	return 0;
 }
 #endif
 
 #ifndef ARCH_HAVE_BREAKPOINT_DATA
-int
-arch_breakpoint_init(struct process *proc, struct breakpoint *sbp)
+int arch_breakpoint_init(struct process *proc, struct breakpoint *sbp)
 {
 	return 0;
 }
 
-void
-arch_breakpoint_destroy(struct breakpoint *sbp)
+void arch_breakpoint_destroy(struct breakpoint *sbp)
 {
 }
 
-int
-arch_breakpoint_clone(struct breakpoint *retp, struct breakpoint *sbp)
+int arch_breakpoint_clone(struct breakpoint *retp, struct breakpoint *sbp)
 {
 	return 0;
 }
@@ -163,7 +150,7 @@ arch_breakpoint_clone(struct breakpoint *retp, struct breakpoint *sbp)
 
 static void
 breakpoint_init_base(struct breakpoint *bp,
-		     arch_addr_t addr, struct library_symbol *libsym)
+					 arch_addr_t addr, struct library_symbol *libsym)
 {
 	bp->cbs = NULL;
 	bp->addr = addr;
@@ -176,30 +163,28 @@ breakpoint_init_base(struct breakpoint *bp,
  * (arch_translate_address in particular) should be doable using
  * static lookups of various sections in the ELF file.  We shouldn't
  * need process for anything.  */
-int
-breakpoint_init(struct breakpoint *bp, struct process *proc,
-		arch_addr_t addr, struct library_symbol *libsym)
+int breakpoint_init(struct breakpoint *bp, struct process *proc,
+					arch_addr_t addr, struct library_symbol *libsym)
 {
 	breakpoint_init_base(bp, addr, libsym);
 	if (os_breakpoint_init(proc, bp) < 0)
 		return -1;
-	if (arch_breakpoint_init(proc, bp) < 0) {
+	if (arch_breakpoint_init(proc, bp) < 0)
+	{
 		os_breakpoint_destroy(bp);
 		return -1;
 	}
 	return 0;
 }
 
-void
-breakpoint_set_callbacks(struct breakpoint *bp, struct bp_callbacks *cbs)
+void breakpoint_set_callbacks(struct breakpoint *bp, struct bp_callbacks *cbs)
 {
 	if (bp->cbs != NULL)
 		assert(bp->cbs == NULL);
 	bp->cbs = cbs;
 }
 
-void
-breakpoint_destroy(struct breakpoint *bp)
+void breakpoint_destroy(struct breakpoint *bp)
 {
 	if (bp == NULL)
 		return;
@@ -207,12 +192,12 @@ breakpoint_destroy(struct breakpoint *bp)
 	os_breakpoint_destroy(bp);
 }
 
-int
-breakpoint_clone(struct breakpoint *retp, struct process *new_proc,
-		 struct breakpoint *bp)
+int breakpoint_clone(struct breakpoint *retp, struct process *new_proc,
+					 struct breakpoint *bp)
 {
 	struct library_symbol *libsym = NULL;
-	if (bp->libsym != NULL) {
+	if (bp->libsym != NULL)
+	{
 		int rc = proc_find_symbol(new_proc, bp->libsym, NULL, &libsym);
 		assert(rc == 0);
 	}
@@ -222,7 +207,8 @@ breakpoint_clone(struct breakpoint *retp, struct process *new_proc,
 	retp->enabled = bp->enabled;
 	if (os_breakpoint_clone(retp, bp) < 0)
 		return -1;
-	if (arch_breakpoint_clone(retp, bp) < 0) {
+	if (arch_breakpoint_clone(retp, bp) < 0)
+	{
 		os_breakpoint_destroy(retp);
 		return -1;
 	}
@@ -230,11 +216,11 @@ breakpoint_clone(struct breakpoint *retp, struct process *new_proc,
 	return 0;
 }
 
-int
-breakpoint_turn_on(struct breakpoint *bp, struct process *proc)
+int breakpoint_turn_on(struct breakpoint *bp, struct process *proc)
 {
 	bp->enabled++;
-	if (bp->enabled == 1) {
+	if (bp->enabled == 1)
+	{
 		assert(proc->pid != 0);
 		enable_breakpoint(proc, bp);
 		breakpoint_on_install(bp, proc);
@@ -242,8 +228,7 @@ breakpoint_turn_on(struct breakpoint *bp, struct process *proc)
 	return 0;
 }
 
-int
-breakpoint_turn_off(struct breakpoint *bp, struct process *proc)
+int breakpoint_turn_off(struct breakpoint *bp, struct process *proc)
 {
 	bp->enabled--;
 	if (bp->enabled == 0)
@@ -257,8 +242,8 @@ create_default_return_bp(struct process *proc)
 {
 	struct breakpoint *bp = malloc(sizeof *bp);
 	arch_addr_t return_addr = get_return_addr(proc, proc->stack_pointer);
-	if (return_addr == 0 || bp == NULL
-	    || breakpoint_init(bp, proc, return_addr, NULL) < 0) {
+	if (return_addr == 0 || bp == NULL || breakpoint_init(bp, proc, return_addr, NULL) < 0)
+	{
 		free(bp);
 		return NULL;
 	}
@@ -267,16 +252,15 @@ create_default_return_bp(struct process *proc)
 
 struct breakpoint *
 insert_breakpoint_at(struct process *proc, arch_addr_t addr,
-		     struct library_symbol *libsym)
+					 struct library_symbol *libsym)
 {
 	debug(DEBUG_FUNCTION,
-	      "insert_breakpoint_at(pid=%d, addr=%p, symbol=%s)",
-	      proc->pid, addr, libsym ? libsym->name : "NULL");
-
+		  "insert_breakpoint_at(pid=%d, addr=%p, symbol=%s)",
+		  proc->pid, addr, libsym ? libsym->name : "NULL");
 	assert(addr != 0);
-
 	struct breakpoint *bp = malloc(sizeof *bp);
-	if (bp == NULL || breakpoint_init(bp, proc, addr, libsym) < 0) {
+	if (bp == NULL || breakpoint_init(bp, proc, addr, libsym) < 0)
+	{
 		free(bp);
 		return NULL;
 	}
@@ -290,7 +274,8 @@ insert_breakpoint_at(struct process *proc, arch_addr_t addr,
 	 * mangled.  */
 
 	struct breakpoint *tmp = insert_breakpoint(proc, bp);
-	if (tmp != bp) {
+	if (tmp != bp)
+	{
 		breakpoint_destroy(bp);
 		free(bp);
 	}
@@ -314,13 +299,16 @@ insert_breakpoint(struct process *proc, struct breakpoint *bp)
 	 * to have more than one breakpoint per address is return from
 	 * a recursive library call.  */
 	struct breakpoint *ext_bp = bp;
-	if (DICT_FIND_VAL(leader->breakpoints, &bp->addr, &ext_bp) != 0) {
+
+	if (DICT_FIND_VAL(leader->breakpoints, &bp->addr, &ext_bp) != 0)
+	{
 		if (proc_add_breakpoint(leader, bp) < 0)
 			return NULL;
 		ext_bp = bp;
 	}
 
-	if (breakpoint_turn_on(ext_bp, proc) < 0) {
+	if (breakpoint_turn_on(ext_bp, proc) < 0)
+	{
 		if (ext_bp != bp)
 			proc_remove_breakpoint(leader, bp);
 		return NULL;
@@ -329,11 +317,10 @@ insert_breakpoint(struct process *proc, struct breakpoint *bp)
 	return ext_bp;
 }
 
-void
-delete_breakpoint_at(struct process *proc, arch_addr_t addr)
+void delete_breakpoint_at(struct process *proc, arch_addr_t addr)
 {
 	debug(DEBUG_FUNCTION, "delete_breakpoint_at(pid=%d, addr=%p)",
-	      proc->pid, addr);
+		  proc->pid, addr);
 
 	struct process *leader = proc->leader;
 	assert(leader != NULL);
@@ -342,14 +329,14 @@ delete_breakpoint_at(struct process *proc, arch_addr_t addr)
 	DICT_FIND_VAL(leader->breakpoints, &addr, &bp);
 	assert(bp != NULL);
 
-	if (delete_breakpoint(proc, bp) < 0) {
+	if (delete_breakpoint(proc, bp) < 0)
+	{
 		fprintf(stderr, "Couldn't turn off the breakpoint %s@%p\n",
-			breakpoint_name(bp), bp->addr);
+				breakpoint_name(bp), bp->addr);
 	}
 }
 
-int
-delete_breakpoint(struct process *proc, struct breakpoint *bp)
+int delete_breakpoint(struct process *proc, struct breakpoint *bp)
 {
 	struct process *leader = proc->leader;
 	assert(leader != NULL);
@@ -357,7 +344,8 @@ delete_breakpoint(struct process *proc, struct breakpoint *bp)
 	if (breakpoint_turn_off(bp, proc) < 0)
 		return -1;
 
-	if (bp->enabled == 0) {
+	if (bp->enabled == 0)
+	{
 		proc_remove_breakpoint(leader, bp);
 		breakpoint_destroy(bp);
 		free(bp);
@@ -390,13 +378,12 @@ disable_bp_cb(arch_addr_t *addr, struct breakpoint **bpp, void *data)
 	return CBS_CONT;
 }
 
-void
-disable_all_breakpoints(struct process *proc)
+void disable_all_breakpoints(struct process *proc)
 {
 	debug(DEBUG_FUNCTION, "disable_all_breakpoints(pid=%d)", proc->pid);
 	assert(proc->leader == proc);
 	DICT_EACH(proc->breakpoints, arch_addr_t, struct breakpoint *,
-		  NULL, disable_bp_cb, proc);
+			  NULL, disable_bp_cb, proc);
 }
 
 static void
@@ -408,10 +395,9 @@ entry_breakpoint_on_hit(struct breakpoint *bp, struct process *proc)
 	process_hit_start(proc);
 }
 
-int
-entry_breakpoint_init(struct process *proc,
-		      struct breakpoint *bp, arch_addr_t addr,
-		      struct library *lib)
+int entry_breakpoint_init(struct process *proc,
+						  struct breakpoint *bp, arch_addr_t addr,
+						  struct library *lib)
 {
 	assert(addr != 0);
 	int err = breakpoint_init(bp, proc, addr, NULL);
@@ -425,8 +411,7 @@ entry_breakpoint_init(struct process *proc,
 	return 0;
 }
 
-int
-breakpoints_init(struct process *proc)
+int breakpoints_init(struct process *proc)
 {
 	debug(DEBUG_FUNCTION, "breakpoints_init(pid=%d)", proc->pid);
 
@@ -442,12 +427,15 @@ breakpoints_init(struct process *proc)
 	assert(proc->filename != NULL);
 
 	struct library *lib = ltelf_read_main_binary(proc, proc->filename);
+
 	struct breakpoint *entry_bp = NULL;
 	int bp_state = 0;
 	int result = -1;
-	switch ((int)(lib != NULL)) {
+	switch ((int)(lib != NULL))
+	{
 	fail:
-		switch (bp_state) {
+		switch (bp_state)
+		{
 		case 2:
 			proc_remove_library(proc, lib);
 			proc_remove_breakpoint(proc, entry_bp);
@@ -461,15 +449,17 @@ breakpoints_init(struct process *proc)
 	}
 
 	entry_bp = malloc(sizeof(*entry_bp));
-	if (entry_bp == NULL
-	    || (entry_breakpoint_init(proc, entry_bp,
-				      lib->entry, lib)) < 0) {
+	if (entry_bp == NULL || (entry_breakpoint_init(proc, entry_bp,
+												   lib->entry, lib)) < 0)
+	{
 		fprintf(stderr,
-			"Couldn't initialize entry breakpoint for PID %d.\n"
-			"Some tracing events may be missed.\n", proc->pid);
+				"Couldn't initialize entry breakpoint for PID %d.\n"
+				"Some tracing events may be missed.\n",
+				proc->pid);
 		free(entry_bp);
-
-	} else {
+	}
+	else
+	{
 		++bp_state;
 
 		if ((result = proc_add_breakpoint(proc, entry_bp)) < 0)
@@ -479,6 +469,7 @@ breakpoints_init(struct process *proc)
 		if ((result = breakpoint_turn_on(entry_bp, proc)) < 0)
 			goto fail;
 	}
+
 	proc_add_library(proc, lib);
 
 	proc->callstack_depth = 0;

@@ -32,6 +32,20 @@ enum tof {
 	LT_TOF_SYSCALL,		/* A syscall */
 	LT_TOF_SYSCALLR,	/* Return from a syscall */
 };
+struct fetch_one_param_data
+{
+	struct process *proc;
+	struct fetch_context *context;
+	struct value_dict *arguments;
+	ssize_t *params_leftp;
+	enum tof tof;
+};
+
+struct format_argument_data
+{
+	struct value *value;
+	struct value_dict *arguments;
+};
 
 /* The contents of the structure is defined by the back end.  */
 struct fetch_context;
@@ -91,5 +105,9 @@ void arch_fetch_arg_done(struct fetch_context *context);
 int arch_fetch_param_pack_start(struct fetch_context *context,
 				enum param_pack_flavor ppflavor);
 void arch_fetch_param_pack_end(struct fetch_context *context);
-
+int
+fetch_params(enum tof type, struct process *proc,
+			 struct fetch_context *context,
+			 struct value_dict *arguments, struct prototype *func,
+			 ssize_t *params_leftp);
 #endif /* FETCH_H */
